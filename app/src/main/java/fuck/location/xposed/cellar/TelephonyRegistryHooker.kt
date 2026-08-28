@@ -77,22 +77,6 @@ class TelephonyRegistryHooker {
                                                 }.invoke(callBack, null)
                                             }
                                         }
-                                    } else {    // Android 9 do not support 5G network
-                                        when (originalCellIdentity) {
-                                            is CellIdentityLte -> {
-                                                findMethod(callBack.javaClass) {
-                                                    name == "onCellLocationChanged"
-                                                }.invoke(
-                                                    callBack,
-                                                    Lte().alterCellIdentity(originalCellIdentity)
-                                                )
-                                            }
-                                            else -> {
-                                                findMethod(callBack.javaClass) {
-                                                    name == "onCellLocationChanged"
-                                                }.invoke(callBack, null)
-                                            }
-                                        }
                                     } else {
                                         findMethod(callBack.javaClass) {
                                             name == "onCellLocationChanged"
