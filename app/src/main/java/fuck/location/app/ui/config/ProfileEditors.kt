@@ -4,6 +4,7 @@ import android.content.Context
 import android.text.Editable
 import android.text.TextWatcher
 import android.widget.EditText
+import com.google.android.material.switchmaterial.SwitchMaterial
 import com.afollestad.materialdialogs.LayoutMode
 import com.afollestad.materialdialogs.MaterialDialog
 import com.afollestad.materialdialogs.bottomsheets.BottomSheet
@@ -45,6 +46,8 @@ object ProfileEditors {
             customView(R.layout.dialog_location, scrollable = true, horizontalPadding = true)
 
             val view = getCustomView()
+            view.findViewById<SwitchMaterial>(R.id.switch_location_enabled).isChecked =
+                profile.locationEnabled
             view.findViewById<EditText>(R.id.field_latitude).setText(plainNumber.format(profile.x))
             view.findViewById<EditText>(R.id.field_longitude).setText(plainNumber.format(profile.y))
             view.findViewById<EditText>(R.id.field_offset).setText(plainNumber.format(profile.offset))
@@ -55,6 +58,7 @@ object ProfileEditors {
                 ConfigGateway.get().writeProfileStore(
                     store.replacing(
                         profile.copy(
+                            locationEnabled = fields.switched(R.id.switch_location_enabled),
                             x = fields.decimal(R.id.field_latitude, profile.x),
                             y = fields.decimal(R.id.field_longitude, profile.y),
                             offset = fields.decimal(R.id.field_offset, profile.offset)
@@ -77,6 +81,7 @@ object ProfileEditors {
             customView(R.layout.dialog_cell, scrollable = true, horizontalPadding = true)
 
             val view = getCustomView()
+            view.findViewById<SwitchMaterial>(R.id.switch_cell_enabled).isChecked = profile.cellEnabled
             view.findViewById<EditText>(R.id.field_mcc).setText(profile.mcc)
             view.findViewById<EditText>(R.id.field_mnc).setText(profile.mnc)
             view.findViewById<EditText>(R.id.field_tac).setText(profile.tac.toString())
@@ -97,6 +102,7 @@ object ProfileEditors {
                 ConfigGateway.get().writeProfileStore(
                     store.replacing(
                         profile.copy(
+                            cellEnabled = fields.switched(R.id.switch_cell_enabled),
                             mcc = fields.text(R.id.field_mcc),
                             mnc = fields.text(R.id.field_mnc),
                             tac = fields.integer(R.id.field_tac, profile.tac),
@@ -121,14 +127,21 @@ object ProfileEditors {
             title(text = context.getString(R.string.dialog_wifi_title, profile.displayName(context)))
             customView(R.layout.dialog_wifi, scrollable = true, horizontalPadding = true)
 
-            getCustomView().findViewById<EditText>(R.id.field_wifi_list)
+            val view = getCustomView()
+            view.findViewById<SwitchMaterial>(R.id.switch_wifi_enabled).isChecked = profile.wifiEnabled
+            view.findViewById<EditText>(R.id.field_wifi_list)
                 .setText(WifiListFormat.format(profile.wifiAccessPoints))
 
             positiveButton(R.string.action_save) { dialog ->
-                val text = dialog.getCustomView().text(R.id.field_wifi_list)
+                val fields = dialog.getCustomView()
 
                 ConfigGateway.get().writeProfileStore(
-                    store.replacing(profile.copy(wifiAccessPoints = WifiListFormat.parse(text)))
+                    store.replacing(
+                        profile.copy(
+                            wifiEnabled = fields.switched(R.id.switch_wifi_enabled),
+                            wifiAccessPoints = WifiListFormat.parse(fields.text(R.id.field_wifi_list)),
+                        )
+                    )
                 )
                 onSaved()
             }
@@ -186,10 +199,17 @@ object ProfileEditors {
         val store = ConfigGateway.get().readProfileStore()
         val profile = store.profiles.firstOrNull { it.id == profileId } ?: return
 
+        // Showing the on/off state here saves opening all three to find out
+        // what a profile does.
+        fun labelled(titleRes: Int, enabled: Boolean) = context.getString(
+            if (enabled) R.string.profile_feature_on else R.string.profile_feature_off,
+            context.getString(titleRes),
+        )
+
         val actions = listOf(
-            context.getString(R.string.title_location_spoof),
-            context.getString(R.string.title_cell_spoof),
-            context.getString(R.string.title_wifi_spoof),
+            labelled(R.string.title_location_spoof, profile.locationEnabled),
+            labelled(R.string.title_cell_spoof, profile.cellEnabled),
+            labelled(R.string.title_wifi_spoof, profile.wifiEnabled),
             context.getString(R.string.profile_action_default),
             context.getString(R.string.profile_action_rename),
             context.getString(R.string.profile_action_delete),
@@ -346,6 +366,9 @@ object ProfileEditors {
 
     private fun android.view.View.decimal(id: Int, fallback: Double): Double =
         text(id).toDoubleOrNull() ?: fallback
+
+    private fun android.view.View.switched(id: Int): Boolean =
+        findViewById<SwitchMaterial>(id).isChecked
 
     // endregion
 }

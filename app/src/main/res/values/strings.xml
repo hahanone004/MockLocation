@@ -38,6 +38,12 @@
     <string name="field_wifi_list">Access points</string>
     <string name="field_wifi_hint">One per line: name | BSSID | signal dBm | frequency MHz. Only the name is required. An empty list reports no networks at all, which is itself conspicuous.</string>
 
+    <string name="switch_enable_location">Spoof location for this profile</string>
+    <string name="switch_enable_cell">Spoof cell tower for this profile</string>
+    <string name="switch_enable_wifi">Spoof Wi-Fi for this profile</string>
+    <string name="profile_feature_on">%s \u00b7 on</string>
+    <string name="profile_feature_off">%s \u00b7 off</string>
+
     <string name="profile_label_default">%s (default)</string>
     <string name="profile_action_new">New profile</string>
     <string name="profile_action_default">Use as default</string>

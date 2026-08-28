@@ -127,16 +127,10 @@
 
                     <TextView
                         style="@style/DefaultText.Option.Card"
-                        android:layout_width="0dp" android:layout_weight="1"
+                        android:layout_width="wrap_content"
                         android:gravity="center_vertical"
                         android:text="@string/title_location_spoof" />
 
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switch_location"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_vertical"
-                        android:layout_marginEnd="16dp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -155,16 +149,10 @@
 
                     <TextView
                         style="@style/DefaultText.Option.Card"
-                        android:layout_width="0dp" android:layout_weight="1"
+                        android:layout_width="wrap_content"
                         android:gravity="center_vertical"
                         android:text="@string/title_cell_spoof" />
 
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switch_cell"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_vertical"
-                        android:layout_marginEnd="16dp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -183,16 +171,10 @@
 
                     <TextView
                         style="@style/DefaultText.Option.Card"
-                        android:layout_width="0dp" android:layout_weight="1"
+                        android:layout_width="wrap_content"
                         android:gravity="center_vertical"
                         android:text="@string/title_wifi_spoof" />
 
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switch_wifi"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_gravity="center_vertical"
-                        android:layout_marginEnd="16dp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 

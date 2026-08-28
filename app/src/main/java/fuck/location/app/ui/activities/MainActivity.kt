@@ -7,10 +7,8 @@ import android.os.Bundle
 import android.view.View
 import androidx.annotation.Keep
 import androidx.appcompat.content.res.AppCompatResources
-import com.google.android.material.switchmaterial.SwitchMaterial
 import fuck.location.R
 import fuck.location.app.ui.config.ProfileEditors
-import fuck.location.app.ui.models.Profile
 import fuck.location.databinding.ActivityMainBinding
 import fuck.location.xposed.helpers.ConfigGateway
 
@@ -36,24 +34,18 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         setContentView(binding.root)
     }
 
-    override fun onResume() {
-        super.onResume()
-
-        // The profile editor and the whitelist screen both change what the
-        // switches should read, so refresh them rather than trusting onCreate.
-        bindSwitches()
-    }
-
     @SuppressLint("CheckResult")
     override fun onClick(v: View) {
         when (v.id) {
             R.id.menu_location_credit -> startActivity(Intent(this, ModuleActivity::class.java))
-            R.id.menu_profiles -> ProfileEditors.manageProfiles(this) { bindSwitches() }
+            R.id.menu_profiles -> ProfileEditors.manageProfiles(this)
             R.id.menu_about -> startActivity(Intent(this, AboutActivity::class.java))
 
-            // The three feature entries edit whichever profile is the default.
+            // The three feature entries edit whichever profile is the default;
+            // each editor carries that profile's switch for its own feature.
             else -> {
-                val defaultProfileId = defaultProfileId() ?: return
+                val defaultProfileId =
+                    ConfigGateway.get().readProfileStore().defaultProfile()?.id ?: return
 
                 when (v.id) {
                     R.id.menu_location_spoof -> ProfileEditors.editLocation(this, defaultProfileId)
@@ -61,43 +53,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
                     R.id.menu_wifi_spoof -> ProfileEditors.editWifi(this, defaultProfileId)
                 }
             }
-        }
-    }
-
-    private fun defaultProfileId(): String? = ConfigGateway.get().readProfileStore().defaultProfile()?.id
-
-    /**
-     * Points the three switches at the default profile. Setting the checked
-     * state fires the listener, so the listener is detached first; otherwise
-     * every refresh would write the config straight back.
-     */
-    private fun bindSwitches() {
-        val store = ConfigGateway.get().readProfileStore()
-        val profile = store.defaultProfile() ?: return
-
-        bindSwitch(binding.switchLocation, profile.locationEnabled) { it.copy(locationEnabled = this) }
-        bindSwitch(binding.switchCell, profile.cellEnabled) { it.copy(cellEnabled = this) }
-        bindSwitch(binding.switchWifi, profile.wifiEnabled) { it.copy(wifiEnabled = this) }
-    }
-
-    private fun bindSwitch(
-        switch: SwitchMaterial,
-        checked: Boolean,
-        update: Boolean.(Profile) -> Profile,
-    ) {
-        switch.setOnCheckedChangeListener(null)
-        switch.isChecked = checked
-        switch.setOnCheckedChangeListener { _, isChecked ->
-            val store = ConfigGateway.get().readProfileStore()
-            val profile = store.defaultProfile() ?: return@setOnCheckedChangeListener
-
-            ConfigGateway.get().writeProfileStore(
-                store.copy(
-                    profiles = store.profiles.map {
-                        if (it.id == profile.id) isChecked.update(it) else it
-                    }
-                )
-            )
         }
     }
 

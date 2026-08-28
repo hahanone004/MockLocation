@@ -29,6 +29,12 @@
     <string name="field_wifi_list">热点列表</string>
     <string name="field_wifi_hint">每行一个：名称 | BSSID | 信号 dBm | 频率 MHz。只有名称是必填的。列表留空会让应用一个 WiFi 都扫不到，这本身也很可疑。</string>
 
+    <string name="switch_enable_location">本配置伪装位置</string>
+    <string name="switch_enable_cell">本配置伪装基站</string>
+    <string name="switch_enable_wifi">本配置伪装 WiFi</string>
+    <string name="profile_feature_on">%s \u00b7 已开启</string>
+    <string name="profile_feature_off">%s \u00b7 已关闭</string>
+
     <string name="profile_label_default">%s（默认）</string>
     <string name="profile_action_new">新建配置</string>
     <string name="profile_action_default">设为默认</string>
