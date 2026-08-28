@@ -4,7 +4,6 @@ import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.AndroidAppHelper
 import android.content.Context
-import android.os.Build
 import fuck.location.xposed.helpers.reflect.*
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.JsonDataException
@@ -68,10 +67,12 @@ class ConfigGateway private constructor() {
     fun hookWillChangeBeEnabled(lpparam: XC_LoadPackage.LoadPackageParam) {
         val clazz = lpparam.classLoader.loadClass("com.android.server.am.ActivityManagerService")
 
-        XposedBridge.log("FL: [debug !!] Finding method")
-        findAllMethods(clazz) {
+        val methods = findAllMethods(clazz, findSuper = true) {
             name == "setProcessMemoryTrimLevel" && isPublic
-        }.hookMethod {
+        }.takeIf { it.isNotEmpty() }
+            ?: throw NoSuchMethodException("setProcessMemoryTrimLevel not found in ${clazz.name}")
+
+        methods.hookMethod {
             before { param ->
                 if (param.args[1] == magicNumber) {
                     when {  // Check what this call intend to do
@@ -98,12 +99,27 @@ class ConfigGateway private constructor() {
     @SuppressLint("PrivateApi")
     @ExperimentalStdlibApi
     fun hookGetTagForIntentSender(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val clazz = lpparam.classLoader.loadClass("com.android.server.pm.PackageManagerService")
+        // Android 13 split PackageManagerService apart: the binder entry points
+        // now live in the inner class IPackageManagerImpl, which inherits this
+        // method from IPackageManagerBase. Looking only at PackageManagerService's
+        // own declared methods therefore matched nothing and silently took every
+        // config read down with it, so try each layout and search superclasses.
+        val candidates = listOf(
+            "com.android.server.pm.IPackageManagerBase",                    // Android 13+
+            "com.android.server.pm.PackageManagerService\$IPackageManagerImpl",
+            "com.android.server.pm.PackageManagerService"                   // Android 12 and older
+        )
 
-        XposedBridge.log("FL: [debug !!] Finding method in getInstallerPackageName")
-        findAllMethods(clazz) {
-            name == "getInstallerPackageName"
-        }.hookMethod {
+        val methods = candidates.firstNotNullOfOrNull { className ->
+            runCatching {
+                findAllMethods(lpparam.classLoader.loadClass(className), findSuper = true) {
+                    name == "getInstallerPackageName" && parameterCount == 1
+                }.takeIf { it.isNotEmpty() }
+                    ?.also { XposedBridge.log("FL: config read channel bound to $className") }
+            }.getOrNull()
+        } ?: throw NoSuchMethodException("getInstallerPackageName not found in any of $candidates")
+
+        methods.hookMethod {
             before { param ->
                 when {
                     param.args[0] == magicNumber.toString() -> {
@@ -332,28 +348,57 @@ class ConfigGateway private constructor() {
 
     // For converting CallerIdentity to packageName
     fun callerIdentityToPackageName(callerIdentity: Any): String {
-        val fields = HiddenApiBypass.getInstanceFields(callerIdentity.javaClass)
-
-        val targetFieldName = when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> "private final java.lang.String android.location.util.identity.CallerIdentity.mPackageName"
-            Build.VERSION.SDK_INT == Build.VERSION_CODES.R -> "public final java.lang.String com.android.server.location.CallerIdentity.packageName"
-            Build.VERSION.SDK_INT == Build.VERSION_CODES.Q -> "public final java.lang.String com.android.server.location.CallerIdentity.mPackageName"
-            Build.VERSION.SDK_INT == Build.VERSION_CODES.P -> "final java.lang.String com.android.server.LocationManagerService.Identity.mPackageName"
-            else -> ""
-        }
-
-        for (field in fields) {
-            if (field.toString() == targetFieldName) {
-                val targetField = field as Field
-                targetField.isAccessible = true
-                return targetField.get(callerIdentity) as String
-            }
-        }
-
         // Workaround for pure string
         if (callerIdentity is String) return callerIdentity
 
-        throw IllegalArgumentException("FL: Invalid CallerIdentity! This should never happen, please report to developer. $callerIdentity")
+        /*
+         * This used to compare Field.toString() against a per-release literal,
+         * which meant any change to the modifiers, the annotations or the
+         * enclosing class name silently stopped resolving the package. Match on
+         * the field name and type instead: the class has moved between
+         * com.android.server.location, com.android.server.LocationManagerService
+         * and android.location.util.identity across P through 16, but the field
+         * has only ever been a String called mPackageName or packageName.
+         */
+        val field = HiddenApiBypass.getInstanceFields(callerIdentity.javaClass)
+            .filterIsInstance<Field>()
+            .firstOrNull {
+                (it.name == "mPackageName" || it.name == "packageName") &&
+                    it.type == String::class.java
+            }
+            ?: throw IllegalArgumentException(
+                "FL: no package name field on ${callerIdentity.javaClass.name}, please report to developer"
+            )
+
+        field.isAccessible = true
+        return field.get(callerIdentity) as String
+    }
+
+    /**
+     * Resolves the calling package from a hooked framework method's arguments.
+     *
+     * Prefers an explicit CallerIdentity when the ROM passes one. Otherwise it
+     * takes the first String that follows a non-String argument, which is where
+     * AOSP consistently puts packageName: it sits after the request or listener
+     * parameter in getLastLocation, getCurrentLocation and the GNSS registration
+     * calls alike, so this survives the parameters being reordered or added to.
+     */
+    fun callerPackageName(param: XC_MethodHook.MethodHookParam): String {
+        val args: Array<Any?> = param.args ?: emptyArray()
+
+        args.firstOrNull { it != null && it.javaClass.name.endsWith("CallerIdentity") }
+            ?.let { return callerIdentityToPackageName(it) }
+
+        var seenNonString = false
+        for (arg in args) {
+            if (arg is String) {
+                if (seenNonString) return arg
+            } else {
+                seenNonString = true
+            }
+        }
+
+        throw IllegalArgumentException("FL: cannot resolve caller package from ${param.method}")
     }
 
     fun setDataPath(){

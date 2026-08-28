@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
+import de.robv.android.xposed.callbacks.XCallback
 import java.lang.reflect.Field
 import java.lang.reflect.Member
 import java.lang.reflect.Method
@@ -126,7 +127,7 @@ class HookFactory(private val method: Method, private val priority: Int) {
 
     internal fun commit(): XC_MethodHook.Unhook {
         val callback = object : XC_MethodHook(priority) {
-            override fun beforeHookedMethod(param: MethodHookParam) {
+            override fun beforeHookedMethod(param: XC_MethodHook.MethodHookParam) {
                 // A throwing hook would propagate into the framework caller, so
                 // failures are contained and logged instead.
                 try {
@@ -136,7 +137,7 @@ class HookFactory(private val method: Method, private val priority: Int) {
                 }
             }
 
-            override fun afterHookedMethod(param: MethodHookParam) {
+            override fun afterHookedMethod(param: XC_MethodHook.MethodHookParam) {
                 try {
                     afterAction?.invoke(param)
                 } catch (e: Throwable) {
@@ -150,32 +151,32 @@ class HookFactory(private val method: Method, private val priority: Int) {
 }
 
 fun Method.hookMethod(
-    priority: Int = XC_MethodHook.PRIORITY_DEFAULT,
+    priority: Int = XCallback.PRIORITY_DEFAULT,
     block: HookFactory.() -> Unit
 ): XC_MethodHook.Unhook = HookFactory(this, priority).apply(block).commit()
 
 fun Iterable<Method>.hookMethod(
-    priority: Int = XC_MethodHook.PRIORITY_DEFAULT,
+    priority: Int = XCallback.PRIORITY_DEFAULT,
     block: HookFactory.() -> Unit
 ): List<XC_MethodHook.Unhook> = map { it.hookMethod(priority, block) }
 
 fun Method.hookBefore(
-    priority: Int = XC_MethodHook.PRIORITY_DEFAULT,
+    priority: Int = XCallback.PRIORITY_DEFAULT,
     action: (XC_MethodHook.MethodHookParam) -> Unit
 ): XC_MethodHook.Unhook = hookMethod(priority) { before(action) }
 
 fun Iterable<Method>.hookBefore(
-    priority: Int = XC_MethodHook.PRIORITY_DEFAULT,
+    priority: Int = XCallback.PRIORITY_DEFAULT,
     action: (XC_MethodHook.MethodHookParam) -> Unit
 ): List<XC_MethodHook.Unhook> = map { it.hookBefore(priority, action) }
 
 fun Method.hookAfter(
-    priority: Int = XC_MethodHook.PRIORITY_DEFAULT,
+    priority: Int = XCallback.PRIORITY_DEFAULT,
     action: (XC_MethodHook.MethodHookParam) -> Unit
 ): XC_MethodHook.Unhook = hookMethod(priority) { after(action) }
 
 fun Iterable<Method>.hookAfter(
-    priority: Int = XC_MethodHook.PRIORITY_DEFAULT,
+    priority: Int = XCallback.PRIORITY_DEFAULT,
     action: (XC_MethodHook.MethodHookParam) -> Unit
 ): List<XC_MethodHook.Unhook> = map { it.hookAfter(priority, action) }
 
@@ -187,7 +188,7 @@ private val mainHandler by lazy { Handler(Looper.getMainLooper()) }
 
 fun runOnMainThread(action: () -> Unit) {
     if (Looper.myLooper() == Looper.getMainLooper()) action()
-    else mainHandler.post(action)
+    else mainHandler.post { action() }
 }
 
 /** Xposed-log shim; [Log.d] etc. keep the call sites in ConfigGateway unchanged. */

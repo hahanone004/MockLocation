@@ -13,6 +13,18 @@ import fuck.location.xposed.helpers.ConfigGateway
 import java.lang.Exception
 
 class LocationHookerAfterS {
+    companion object {
+        /*
+         * onReportLocation is intercepted by temporarily removing whitelisted
+         * registrations from the provider's registration map, so the real method
+         * only reports to everyone else. The map has to be put back afterwards,
+         * hence the handover between the before and after hooks; both run on the
+         * same provider thread, so a ThreadLocal keeps concurrent providers from
+         * clobbering each other.
+         */
+        private val savedRegistrations = ThreadLocal<ArrayMap<*, *>>()
+    }
+
     @SuppressLint("PrivateApi")
     @RequiresApi(Build.VERSION_CODES.S)
     @ExperimentalStdlibApi
@@ -25,6 +37,27 @@ class LocationHookerAfterS {
             before { param ->
                 hookOnReportLocation(clazz, param)
             }
+            after { param ->
+                restoreRegistrations(clazz, param)
+            }
+        }
+    }
+
+    /**
+     * Puts the untouched registration map back. Without this the whitelisted
+     * registrations stayed dropped for good: the provider kept reporting into a
+     * map they had been filtered out of, so a matching app stopped receiving
+     * locations entirely after the first report.
+     */
+    @RequiresApi(Build.VERSION_CODES.S)
+    private fun restoreRegistrations(clazz: Class<*>, param: XC_MethodHook.MethodHookParam) {
+        val saved = savedRegistrations.get() ?: return
+        savedRegistrations.remove()
+
+        try {
+            findField(clazz, true) { name == "mRegistrations" }.set(param.thisObject, saved)
+        } catch (e: Exception) {
+            XposedBridge.log("FL: failed to restore registrations! $e")
         }
     }
 
@@ -39,11 +72,7 @@ class LocationHookerAfterS {
         }.hookMethod {
             after {
                 try {
-                    // Workaround for MIUI. F**k!
-                    val targetParam: Any = if (it.args[0] is String) it.args[2]
-                    else it.args[1]
-
-                    val packageName = ConfigGateway.get().callerIdentityToPackageName(targetParam)
+                    val packageName = ConfigGateway.get().callerPackageName(it)
                     XposedBridge.log("FL: in getLastLocation! Caller package name: $packageName")
 
                     if (ConfigGateway.get().inWhitelist(packageName)) {
@@ -90,11 +119,10 @@ class LocationHookerAfterS {
             name == "getCurrentLocation" && isPublic
         }.hookMethod {
             after { param ->
-                // Workaround for MIUI. F**k!
-                val targetParam: Any = if (param.args[0] is String) param.args[0]
-                else param.args[1]
-
-                val packageName = ConfigGateway.get().callerIdentityToPackageName(targetParam)
+                // args[0] is the provider name here, not the package: reading it
+                // as the caller meant this check compared "fused" against the
+                // whitelist and never matched, on Android 12 either.
+                val packageName = ConfigGateway.get().callerPackageName(param)
 
                 XposedBridge.log("FL: in getCurrentLocation! Caller package name: $packageName")
 
@@ -148,38 +176,52 @@ class LocationHookerAfterS {
     @RequiresApi(Build.VERSION_CODES.S)
     @OptIn(ExperimentalStdlibApi::class)
     private fun hookOnReportLocation(clazz: Class<*>, param: XC_MethodHook.MethodHookParam) {
-        XposedBridge.log("FL: in onReportLocation!")
+        val locationResult = param.args[0] ?: return
 
         val mRegistrations = findField(clazz, true) {
             name == "mRegistrations"
         }
 
-        mRegistrations.isAccessible = true
-
         val registrations = mRegistrations.get(param.thisObject) as ArrayMap<*, *>
-        val newRegistrations = ArrayMap<Any, Any>()
+        val passthrough = ArrayMap<Any, Any>()
+
+        val mLocationsField = findField(locationResult.javaClass, true) {
+            name == "mLocations" && isPrivate
+        }
+
+        // The reported LocationResult is shared by every registration, so the
+        // real locations have to be put back before the original method runs.
+        // Substituting them in place used to leak the spoofed position to apps
+        // that were never on the whitelist.
+        val realLocations = mLocationsField.get(locationResult) as ArrayList<*>
+        var substituted = false
 
         registrations.forEach { registration ->
-            val callerIdentity = findField(registration.value.javaClass, true) {
-                name == "mIdentity"
-            }.get(registration.value)
+            val key = registration.key ?: return@forEach
+            val value = registration.value ?: return@forEach
 
-            val packageName = ConfigGateway.get().callerIdentityToPackageName(callerIdentity!!)
+            val packageName = try {
+                val callerIdentity = findField(value.javaClass, true) {
+                    name == "mIdentity"
+                }.get(value)
+
+                ConfigGateway.get().callerIdentityToPackageName(callerIdentity!!)
+            } catch (e: Exception) {
+                // An unreadable registration is reported to as usual rather than
+                // being dropped on the floor.
+                XposedBridge.log("FL: cannot resolve registration identity, passing through: $e")
+                passthrough[key] = value
+                return@forEach
+            }
 
             if (!ConfigGateway.get().inWhitelist(packageName)) {
-                newRegistrations[registration.key] = registration.value
-            } else {
-                val value = registration.value
-                val locationResult = param.args[0]
+                passthrough[key] = value
+                return@forEach
+            }
 
-                val mLocationsField = findField(locationResult.javaClass, true) {
-                    name == "mLocations" && isPrivate
-                }
-
-                mLocationsField.isAccessible = true
-                val mLocations = mLocationsField.get(locationResult) as ArrayList<*>
-
-                val originLocation = (mLocations[0] as Location).takeIf { mLocations.isNotEmpty() } ?: Location(LocationManager.GPS_PROVIDER)
+            try {
+                val originLocation = realLocations.firstOrNull() as? Location
+                    ?: Location(LocationManager.GPS_PROVIDER)
                 val fakeLocation = ConfigGateway.get().readFakeLocation()
 
                 val location = Location(originLocation.provider)
@@ -200,19 +242,23 @@ class LocationHookerAfterS {
                 location.verticalAccuracyMeters = originLocation.verticalAccuracyMeters
 
                 mLocationsField.set(locationResult, arrayListOf(location))
+                substituted = true
 
-                val method = findMethod(value.javaClass, true) {
+                val operation = findMethod(value.javaClass, true) {
                     name == "acceptLocationChange"
-                }
-
-                val operation = method.invoke(value, locationResult)
+                }.invoke(value, locationResult)
 
                 findMethod(value.javaClass, true) {
                     name == "executeOperation"
                 }.invoke(value, operation)
+            } catch (e: Exception) {
+                XposedBridge.log("FL: failed to deliver custom location to $packageName: $e")
             }
         }
 
-        mRegistrations.set(param.thisObject, newRegistrations)
+        if (substituted) mLocationsField.set(locationResult, realLocations)
+
+        savedRegistrations.set(registrations)
+        mRegistrations.set(param.thisObject, passthrough)
     }
 }

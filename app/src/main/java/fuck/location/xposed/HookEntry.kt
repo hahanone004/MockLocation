@@ -24,7 +24,6 @@ import fuck.location.xposed.location.gnss.GnssManagerServiceHookerS
 import fuck.location.xposed.location.miui.MiuiBlurLocationManagerHookerR
 import fuck.location.xposed.location.miui.MiuiBlurLocationManagerHookerS
 import fuck.location.xposed.location.oplus.NlpDLCS
-import java.lang.Exception
 
 @ExperimentalStdlibApi
 class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
@@ -34,81 +33,94 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
         ConfigGateway.get().setDataPath()
     }
 
+    /**
+     * Installs one hook in isolation. A missing class or renamed field on some
+     * ROM used to abort every remaining hook in the same try block, so a single
+     * incompatibility silently disabled the whole module.
+     */
+    private inline fun step(name: String, action: () -> Unit) {
+        try {
+            action()
+        } catch (t: Throwable) {
+            XposedBridge.log("FL: hook step '$name' failed: $t")
+        }
+    }
+
     @SuppressLint("PrivateApi", "ObsoleteSdkInt", "NewApi")
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam?) {
-        if (lpparam != null) {
-            when (lpparam.packageName) {
-                BuildConfig.APPLICATION_ID -> {
-                    XposedBridge.log("FL: Try to hook the module")
-                    val clazz = lpparam.classLoader.loadClass("fuck.location.app.ui.activities.MainActivity")
+        if (lpparam == null) return
 
-                    findAllMethods(clazz) {
-                        name == "isModuleActivated" && isPublic
-                    }.hookMethod {
-                        after { param ->
-                            XposedBridge.log("FL: Unlock the module")
-                            param.result = true
-                        }
-                    }
-                }
+        when (lpparam.packageName) {
+            BuildConfig.APPLICATION_ID -> {
+                XposedBridge.log("FL: Try to hook the module")
+                val clazz = lpparam.classLoader.loadClass("fuck.location.app.ui.activities.MainActivity")
 
-                "android" -> {
-                    Log.tag = "FuckLocation"
-
-                    XposedBridge.log("FL: Finding method")
-
-                    try {
-                        // Initialize gateway
-                        ConfigGateway.get().hookWillChangeBeEnabled(lpparam)
-                        ConfigGateway.get().hookGetTagForIntentSender(lpparam)
-
-                        TelephonyRegistryHooker().hookListen(lpparam)
-
-                        // For Android 12 and MIUI, run this hook
-                        when (Build.VERSION.SDK_INT) {
-                            Build.VERSION_CODES.S -> {
-                                if (Miui().isMIUI()) {
-                                    MiuiBlurLocationManagerHookerS().hookGetBlurryLocationS(lpparam)
-                                } else if (Oplus().isOplus()) {
-                                    NlpDLCS().hookColorOS(lpparam)
-                                }
-                                LocationHookerAfterS().hookLastLocation(lpparam)
-                                LocationHookerAfterS().hookDLC(lpparam)
-
-                                GnssManagerServiceHookerS().hookRegisterGnssNmeaCallback(lpparam)
-                            }
-                            Build.VERSION_CODES.R -> {  // Android 11 and MIUI
-                                if (Miui().isMIUI()) {
-                                    MiuiBlurLocationManagerHookerR().hookGetBlurryLocation(lpparam)
-                                }
-
-                                LocationHookerR().hookLastLocation(lpparam)
-                                LocationHookerR().hookDLC(lpparam)
-
-                                GnssManagerServiceHookerR().hookAddGnssBatchingCallback(lpparam)
-                            }
-                            else -> {    // For Android 10 and earlier, run this fallback version
-                                LocationHookerPreQ().hookLastLocation(lpparam)
-
-                                GnssHookerPreQ().hookAddGnssBatchingCallback(lpparam)
-                            }
-                        }
-
-                        WLANHooker().hookWifiManager(lpparam)
-                    } catch (e: Exception) {
-                        XposedBridge.log("FL: fuck with exceptions: $e")
-                    }
-                }
-
-                "com.android.phone" -> {
-                    try {
-                        PhoneInterfaceManagerHooker().hookCellLocation(lpparam)
-                    } catch (e: Exception) {
-                        XposedBridge.log("FL: fuck with exceptions (cellar): $e")
+                findAllMethods(clazz) {
+                    name == "isModuleActivated" && isPublic
+                }.hookMethod {
+                    after { param ->
+                        XposedBridge.log("FL: Unlock the module")
+                        param.result = true
                     }
                 }
             }
-        }
 
+            "android" -> {
+                Log.tag = "FuckLocation"
+                XposedBridge.log("FL: hooking system_server, API ${Build.VERSION.SDK_INT}")
+
+                step("config gateway (write)") { ConfigGateway.get().hookWillChangeBeEnabled(lpparam) }
+                step("config gateway (read)") { ConfigGateway.get().hookGetTagForIntentSender(lpparam) }
+                step("telephony registry") { TelephonyRegistryHooker().hookListen(lpparam) }
+
+                when {
+                    // Android 12 moved LocationProviderManager into
+                    // com.android.server.location.provider and 13 through 16 kept
+                    // that layout, so one hooker covers S and everything after it.
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+                        if (Miui().isMIUI()) {
+                            step("miui blurry location") {
+                                MiuiBlurLocationManagerHookerS().hookGetBlurryLocationS(lpparam)
+                            }
+                        } else if (Oplus().isOplus()) {
+                            step("oplus nlp") { NlpDLCS().hookColorOS(lpparam) }
+                        }
+
+                        step("last location") { LocationHookerAfterS().hookLastLocation(lpparam) }
+                        step("location DLC") { LocationHookerAfterS().hookDLC(lpparam) }
+                        step("gnss") {
+                            GnssManagerServiceHookerS().hookRegisterGnssNmeaCallback(lpparam)
+                        }
+                    }
+
+                    Build.VERSION.SDK_INT == Build.VERSION_CODES.R -> {
+                        if (Miui().isMIUI()) {
+                            step("miui blurry location") {
+                                MiuiBlurLocationManagerHookerR().hookGetBlurryLocation(lpparam)
+                            }
+                        }
+
+                        step("last location") { LocationHookerR().hookLastLocation(lpparam) }
+                        step("location DLC") { LocationHookerR().hookDLC(lpparam) }
+                        step("gnss") {
+                            GnssManagerServiceHookerR().hookAddGnssBatchingCallback(lpparam)
+                        }
+                    }
+
+                    else -> {    // Android 10 and earlier
+                        step("last location") { LocationHookerPreQ().hookLastLocation(lpparam) }
+                        step("gnss") { GnssHookerPreQ().hookAddGnssBatchingCallback(lpparam) }
+                    }
+                }
+
+                step("wifi") { WLANHooker().hookWifiManager(lpparam) }
+            }
+
+            "com.android.phone" -> {
+                step("phone interface manager") {
+                    PhoneInterfaceManagerHooker().hookCellLocation(lpparam)
+                }
+            }
+        }
     }
 }
