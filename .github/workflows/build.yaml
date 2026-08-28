@@ -22,7 +22,20 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
 
       - name: Build debug APK
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --stacktrace 2>&1 | tee build.log
+
+      # Downloading run logs needs admin rights on the repository, so put the
+      # compiler output where anyone looking at the run can read it.
+      - name: Surface build errors
+        if: failure()
+        run: |
+          details=$(grep -E "^e: |FAILURE:|What went wrong|Caused by:|error:|Could not (find|resolve)" build.log | head -40)
+          details="${details//'%'/'%25'}"
+          details="${details//$'\n'/'%0A'}"
+          details="${details//$'\r'/'%0D'}"
+          echo "::error::${details}"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
