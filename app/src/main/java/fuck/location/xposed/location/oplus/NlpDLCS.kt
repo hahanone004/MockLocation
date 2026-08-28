@@ -6,7 +6,7 @@ import android.location.LocationManager
 import android.os.Build
 import android.util.ArrayMap
 import androidx.annotation.RequiresApi
-import com.github.kyuubiran.ezxhelper.utils.*
+import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage

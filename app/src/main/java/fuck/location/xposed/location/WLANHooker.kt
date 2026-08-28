@@ -5,7 +5,7 @@ import android.net.wifi.ScanResult
 import android.net.wifi.WifiInfo
 import android.os.Build
 import androidx.annotation.RequiresApi
-import com.github.kyuubiran.ezxhelper.utils.*
+import fuck.location.xposed.helpers.reflect.*
 import dalvik.system.PathClassLoader
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage

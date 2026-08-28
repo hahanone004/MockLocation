@@ -3,8 +3,8 @@ package fuck.location.xposed.cellar
 import android.annotation.SuppressLint
 import android.os.Build
 import android.telephony.*
-import com.github.kyuubiran.ezxhelper.utils.*
-import com.github.kyuubiran.ezxhelper.utils.findAllMethods
+import fuck.location.xposed.helpers.reflect.*
+import fuck.location.xposed.helpers.reflect.findAllMethods
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.cellar.identity.Lte

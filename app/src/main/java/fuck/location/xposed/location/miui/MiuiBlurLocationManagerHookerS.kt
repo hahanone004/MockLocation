@@ -8,7 +8,7 @@ import android.telephony.CellIdentityLte
 import android.telephony.CellIdentityNr
 import android.telephony.CellInfo
 import androidx.annotation.RequiresApi
-import com.github.kyuubiran.ezxhelper.utils.*
+import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.cellar.identity.Lte

@@ -4,10 +4,10 @@ import android.annotation.SuppressLint
 import android.os.Build
 import android.telephony.*
 import androidx.annotation.RequiresApi
-import com.github.kyuubiran.ezxhelper.utils.findAllMethods
-import com.github.kyuubiran.ezxhelper.utils.hookBefore
-import com.github.kyuubiran.ezxhelper.utils.hookMethod
-import com.github.kyuubiran.ezxhelper.utils.isPublic
+import fuck.location.xposed.helpers.reflect.findAllMethods
+import fuck.location.xposed.helpers.reflect.hookBefore
+import fuck.location.xposed.helpers.reflect.hookMethod
+import fuck.location.xposed.helpers.reflect.isPublic
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.cellar.identity.Lte

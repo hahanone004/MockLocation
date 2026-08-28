@@ -2,8 +2,7 @@ package fuck.location.xposed
 
 import android.annotation.SuppressLint
 import android.os.Build
-import com.github.kyuubiran.ezxhelper.init.EzXHelperInit
-import com.github.kyuubiran.ezxhelper.utils.*
+import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
 import de.robv.android.xposed.XposedBridge
@@ -30,7 +29,6 @@ import java.lang.Exception
 @ExperimentalStdlibApi
 class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
     override fun initZygote(startupParam: IXposedHookZygoteInit.StartupParam) {
-        EzXHelperInit.initZygote(startupParam)
         XposedBridge.log("FL: in initZygote!")
 
         ConfigGateway.get().setDataPath()
@@ -55,9 +53,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 }
 
                 "android" -> {
-                    EzXHelperInit.initHandleLoadPackage(lpparam)
-                    EzXHelperInit.setLogTag("FuckLocation Xposed")
-                    EzXHelperInit.setToastTag("FL")
+                    Log.tag = "FuckLocation"
 
                     XposedBridge.log("FL: Finding method")
 

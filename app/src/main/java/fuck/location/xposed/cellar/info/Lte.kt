@@ -2,7 +2,7 @@ package fuck.location.xposed.cellar.info
 
 import android.telephony.CellIdentityLte
 import android.telephony.CellInfoLte
-import com.github.kyuubiran.ezxhelper.utils.findField
+import fuck.location.xposed.helpers.reflect.findField
 import fuck.location.xposed.cellar.identity.Lte
 
 class Lte {

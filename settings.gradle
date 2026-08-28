@@ -4,7 +4,8 @@ dependencyResolutionManagement {
         google()
         mavenCentral()
         maven { url "https://jitpack.io" }
-        jcenter() // Warning: this repository is going to shut down soon
+        // jcenter is dead; the Xposed API only lives here now
+        maven { url "https://api.xposed.info/" }
     }
 }
 rootProject.name = "FuckLocation"

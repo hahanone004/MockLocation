@@ -5,7 +5,7 @@ import android.app.ActivityManager
 import android.app.AndroidAppHelper
 import android.content.Context
 import android.os.Build
-import com.github.kyuubiran.ezxhelper.utils.*
+import fuck.location.xposed.helpers.reflect.*
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.JsonDataException
 import com.squareup.moshi.Moshi

@@ -8,10 +8,10 @@ import android.telephony.CellIdentityLte
 import android.telephony.CellIdentityNr
 import android.telephony.CellInfo
 import androidx.annotation.RequiresApi
-import com.github.kyuubiran.ezxhelper.utils.findAllMethods
-import com.github.kyuubiran.ezxhelper.utils.hookAfter
-import com.github.kyuubiran.ezxhelper.utils.hookBefore
-import com.github.kyuubiran.ezxhelper.utils.isPublic
+import fuck.location.xposed.helpers.reflect.findAllMethods
+import fuck.location.xposed.helpers.reflect.hookAfter
+import fuck.location.xposed.helpers.reflect.hookBefore
+import fuck.location.xposed.helpers.reflect.isPublic
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.cellar.identity.Lte

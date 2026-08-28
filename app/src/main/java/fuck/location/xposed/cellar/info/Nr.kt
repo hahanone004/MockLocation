@@ -4,7 +4,7 @@ import android.os.Build
 import android.telephony.CellIdentityNr
 import android.telephony.CellInfoNr
 import androidx.annotation.RequiresApi
-import com.github.kyuubiran.ezxhelper.utils.findField
+import fuck.location.xposed.helpers.reflect.findField
 import fuck.location.xposed.cellar.identity.Nr
 
 class Nr {

@@ -4,7 +4,7 @@ import android.annotation.SuppressLint
 import android.location.Location
 import android.location.LocationManager
 import android.os.Bundle
-import com.github.kyuubiran.ezxhelper.utils.*
+import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.helpers.ConfigGateway

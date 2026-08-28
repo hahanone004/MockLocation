@@ -1,9 +1,9 @@
 package fuck.location.xposed.location.gnss
 
 import android.annotation.SuppressLint
-import com.github.kyuubiran.ezxhelper.utils.findAllMethods
-import com.github.kyuubiran.ezxhelper.utils.hookBefore
-import com.github.kyuubiran.ezxhelper.utils.isPublic
+import fuck.location.xposed.helpers.reflect.findAllMethods
+import fuck.location.xposed.helpers.reflect.hookBefore
+import fuck.location.xposed.helpers.reflect.isPublic
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.helpers.ConfigGateway
