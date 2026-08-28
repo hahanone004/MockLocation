@@ -145,11 +145,14 @@ class ConfigGateway private constructor() {
         try {
             val list = jsonAdapter.fromJson(jsonFile.readText())
 
-            for (name in list!!) {
-                if (packageName.toString().contains(name)) {
-                    param.result = true
-                    return
-                }
+            // Compare the package itself. contains() also matched anything that
+            // merely had a whitelisted entry as a substring, so whitelisting
+            // "com.foo" silently caught "com.foo.other" and "notcom.foo" too.
+            val caller = packageName.toString().substringBefore(':')
+
+            if (list!!.any { it == caller }) {
+                param.result = true
+                return
             }
         } catch (e: Exception) {
             XposedBridge.log("FL: [Track samsung !!] No whitelist file found. You may need to create one first $e")
@@ -419,7 +422,7 @@ class ConfigGateway private constructor() {
     }
 
     private fun generateRandomAppendix() : String {
-        val chars = ('a'..'Z') + ('A'..'Z') + ('0'..'9')
+        val chars = ('a'..'z') + ('A'..'Z') + ('0'..'9')
         return List(16) { chars.random() }.joinToString("")
     }
 }
