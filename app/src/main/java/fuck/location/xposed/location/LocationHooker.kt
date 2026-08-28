@@ -2,9 +2,7 @@ package fuck.location.xposed.location
 
 import android.annotation.SuppressLint
 import android.location.*
-import android.os.Build
 import android.util.ArrayMap
-import androidx.annotation.RequiresApi
 import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
@@ -12,7 +10,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.helpers.ConfigGateway
 import java.lang.Exception
 
-class LocationHookerAfterS {
+class LocationHooker {
     companion object {
         /*
          * onReportLocation is intercepted by temporarily removing whitelisted
@@ -26,7 +24,6 @@ class LocationHookerAfterS {
     }
 
     @SuppressLint("PrivateApi")
-    @RequiresApi(Build.VERSION_CODES.S)
     @ExperimentalStdlibApi
     fun hookLastLocation(lpparam: XC_LoadPackage.LoadPackageParam) {
         val clazz = lpparam.classLoader.loadClass("com.android.server.location.provider.LocationProviderManager")
@@ -49,7 +46,6 @@ class LocationHookerAfterS {
      * map they had been filtered out of, so a matching app stopped receiving
      * locations entirely after the first report.
      */
-    @RequiresApi(Build.VERSION_CODES.S)
     private fun restoreRegistrations(clazz: Class<*>, param: XC_MethodHook.MethodHookParam) {
         val saved = savedRegistrations.get() ?: return
         savedRegistrations.remove()
@@ -62,7 +58,6 @@ class LocationHookerAfterS {
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    @RequiresApi(Build.VERSION_CODES.S)
     @SuppressLint("PrivateApi")
     fun hookDLC(lpparam: XC_LoadPackage.LoadPackageParam) {
         val clazz = lpparam.classLoader.loadClass("com.android.server.location.LocationManagerService")
@@ -173,7 +168,6 @@ class LocationHookerAfterS {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.S)
     @OptIn(ExperimentalStdlibApi::class)
     private fun hookOnReportLocation(clazz: Class<*>, param: XC_MethodHook.MethodHookParam) {
         val locationResult = param.args[0] ?: return

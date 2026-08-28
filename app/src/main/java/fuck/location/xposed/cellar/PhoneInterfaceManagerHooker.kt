@@ -1,9 +1,7 @@
 package fuck.location.xposed.cellar
 
 import android.annotation.SuppressLint
-import android.os.Build
 import android.telephony.*
-import androidx.annotation.RequiresApi
 import fuck.location.xposed.helpers.reflect.findAllMethods
 import fuck.location.xposed.helpers.reflect.hookBefore
 import fuck.location.xposed.helpers.reflect.hookMethod
@@ -16,7 +14,6 @@ import fuck.location.xposed.helpers.ConfigGateway
 
 class PhoneInterfaceManagerHooker {
     @ExperimentalStdlibApi
-    @RequiresApi(Build.VERSION_CODES.R)
     @SuppressLint("PrivateApi")
     fun hookCellLocation(lpparam: XC_LoadPackage.LoadPackageParam) {
         val clazz: Class<*> =
@@ -82,7 +79,7 @@ class PhoneInterfaceManagerHooker {
                     }
 
                     // Android 9 does not have this network type
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && param.result is CellIdentityNr) {
+                    if (param.result is CellIdentityNr) {
                         XposedBridge.log("FL: [Cellar] Using NR Network...")
                         param.result = Nr().alterCellIdentity(param.result as CellIdentityNr)
                     }

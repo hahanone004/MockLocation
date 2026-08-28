@@ -1,7 +1,6 @@
 package fuck.location.xposed.cellar
 
 import android.annotation.SuppressLint
-import android.os.Build
 import android.telephony.*
 import fuck.location.xposed.helpers.reflect.*
 import fuck.location.xposed.helpers.reflect.findAllMethods
@@ -55,45 +54,43 @@ class TelephonyRegistryHooker {
                                 if ((phoneId as Int) >= 0 && phoneId < (mCellIdentity as Array<*>).size) {
                                     val originalCellIdentity = mCellIdentity[phoneId]
                                     if (originalCellIdentity != null) {
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                            when (originalCellIdentity) {
-                                                is CellIdentityLte -> {
-                                                    findMethod(callBack.javaClass) {
-                                                        name == "onCellLocationChanged"
-                                                    }.invoke(
-                                                        callBack,
-                                                        Lte().alterCellIdentity(originalCellIdentity)
-                                                    )
-                                                }
-                                                is CellIdentityNr -> {
-                                                    findMethod(callBack.javaClass) {
-                                                        name == "onCellLocationChanged"
-                                                    }.invoke(
-                                                        callBack,
-                                                        Nr().alterCellIdentity(originalCellIdentity)
-                                                    )
-                                                }
-                                                else -> {
-                                                    findMethod(callBack.javaClass) {
-                                                        name == "onCellLocationChanged"
-                                                    }.invoke(callBack, null)
-                                                }
+                                        when (originalCellIdentity) {
+                                            is CellIdentityLte -> {
+                                                findMethod(callBack.javaClass) {
+                                                    name == "onCellLocationChanged"
+                                                }.invoke(
+                                                    callBack,
+                                                    Lte().alterCellIdentity(originalCellIdentity)
+                                                )
                                             }
-                                        } else {    // Android 9 do not support 5G network
-                                            when (originalCellIdentity) {
-                                                is CellIdentityLte -> {
-                                                    findMethod(callBack.javaClass) {
-                                                        name == "onCellLocationChanged"
-                                                    }.invoke(
-                                                        callBack,
-                                                        Lte().alterCellIdentity(originalCellIdentity)
-                                                    )
-                                                }
-                                                else -> {
-                                                    findMethod(callBack.javaClass) {
-                                                        name == "onCellLocationChanged"
-                                                    }.invoke(callBack, null)
-                                                }
+                                            is CellIdentityNr -> {
+                                                findMethod(callBack.javaClass) {
+                                                    name == "onCellLocationChanged"
+                                                }.invoke(
+                                                    callBack,
+                                                    Nr().alterCellIdentity(originalCellIdentity)
+                                                )
+                                            }
+                                            else -> {
+                                                findMethod(callBack.javaClass) {
+                                                    name == "onCellLocationChanged"
+                                                }.invoke(callBack, null)
+                                            }
+                                        }
+                                    } else {    // Android 9 do not support 5G network
+                                        when (originalCellIdentity) {
+                                            is CellIdentityLte -> {
+                                                findMethod(callBack.javaClass) {
+                                                    name == "onCellLocationChanged"
+                                                }.invoke(
+                                                    callBack,
+                                                    Lte().alterCellIdentity(originalCellIdentity)
+                                                )
+                                            }
+                                            else -> {
+                                                findMethod(callBack.javaClass) {
+                                                    name == "onCellLocationChanged"
+                                                }.invoke(callBack, null)
                                             }
                                         }
                                     } else {
@@ -124,29 +121,18 @@ class TelephonyRegistryHooker {
 
                                         (originalCellInfoList as List<*>).forEach { cellInfo ->
                                             if (cellInfo != null) {
-                                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                                    when (cellInfo) {
-                                                        is CellInfoLte -> {
-                                                            modifiedCellInfoList.add(
-                                                                fuck.location.xposed.cellar.info.Lte()
-                                                                    .constructNewCellInfoLte(cellInfo)
-                                                            )
-                                                        }
-                                                        is CellInfoNr -> {
-                                                            modifiedCellInfoList.add(
-                                                                fuck.location.xposed.cellar.info.Nr()
-                                                                    .constructNewCellInfoNr(cellInfo)
-                                                            )
-                                                        }
+                                                when (cellInfo) {
+                                                    is CellInfoLte -> {
+                                                        modifiedCellInfoList.add(
+                                                            fuck.location.xposed.cellar.info.Lte()
+                                                                .constructNewCellInfoLte(cellInfo)
+                                                        )
                                                     }
-                                                } else {
-                                                    when (cellInfo) {
-                                                        is CellInfoLte -> {
-                                                            modifiedCellInfoList.add(
-                                                                fuck.location.xposed.cellar.info.Lte()
-                                                                    .constructNewCellInfoLte(cellInfo)
-                                                            )
-                                                        }
+                                                    is CellInfoNr -> {
+                                                        modifiedCellInfoList.add(
+                                                            fuck.location.xposed.cellar.info.Nr()
+                                                                .constructNewCellInfoNr(cellInfo)
+                                                        )
                                                     }
                                                 }
                                             }

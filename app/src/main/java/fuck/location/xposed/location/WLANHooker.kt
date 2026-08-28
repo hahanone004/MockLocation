@@ -3,8 +3,6 @@ package fuck.location.xposed.location
 import android.annotation.SuppressLint
 import android.net.wifi.ScanResult
 import android.net.wifi.WifiInfo
-import android.os.Build
-import androidx.annotation.RequiresApi
 import fuck.location.xposed.helpers.reflect.*
 import dalvik.system.PathClassLoader
 import de.robv.android.xposed.XposedBridge
@@ -12,7 +10,6 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.helpers.ConfigGateway
 
 class WLANHooker {
-    @RequiresApi(Build.VERSION_CODES.R)
     @ExperimentalStdlibApi
     @SuppressLint("PrivateApi")
     fun hookWifiManager(lpparam: XC_LoadPackage.LoadPackageParam) {

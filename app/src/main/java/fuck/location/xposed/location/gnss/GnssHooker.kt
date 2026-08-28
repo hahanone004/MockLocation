@@ -8,9 +8,9 @@ import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.helpers.ConfigGateway
 
-class GnssManagerServiceHookerS {
+class GnssHooker {
     @SuppressLint("PrivateApi")
-    fun hookRegisterGnssNmeaCallback(lpparam: XC_LoadPackage.LoadPackageParam) {
+    fun hookGnssCallbacks(lpparam: XC_LoadPackage.LoadPackageParam) {
         val clazz =
             lpparam.classLoader.loadClass("com.android.server.location.gnss.GnssManagerService")
 

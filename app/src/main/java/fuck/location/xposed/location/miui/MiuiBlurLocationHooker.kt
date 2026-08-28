@@ -3,11 +3,9 @@ package fuck.location.xposed.location.miui
 import android.annotation.SuppressLint
 import android.location.Location
 import android.location.LocationManager
-import android.os.Build
 import android.telephony.CellIdentityLte
 import android.telephony.CellIdentityNr
 import android.telephony.CellInfo
-import androidx.annotation.RequiresApi
 import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
@@ -17,11 +15,10 @@ import fuck.location.xposed.helpers.ConfigGateway
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.lang.Exception
 
-class MiuiBlurLocationManagerHookerS {
+class MiuiBlurLocationHooker {
     @SuppressLint("PrivateApi")
-    @RequiresApi(Build.VERSION_CODES.S)
     @OptIn(ExperimentalStdlibApi::class)
-    fun hookGetBlurryLocationS(lpparam: XC_LoadPackage.LoadPackageParam) {
+    fun hookGetBlurryLocation(lpparam: XC_LoadPackage.LoadPackageParam) {
         val clazz =
             lpparam.classLoader.loadClass("com.android.server.location.MiuiBlurLocationManagerImpl")
 

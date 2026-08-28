@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId "fuck.location"
-        minSdk 28
+        minSdk 36
         targetSdk 36
         versionCode 723
         versionName "1.3.0"

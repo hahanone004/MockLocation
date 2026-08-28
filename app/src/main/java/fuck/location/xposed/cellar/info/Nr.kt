@@ -1,14 +1,11 @@
 package fuck.location.xposed.cellar.info
 
-import android.os.Build
 import android.telephony.CellIdentityNr
 import android.telephony.CellInfoNr
-import androidx.annotation.RequiresApi
 import fuck.location.xposed.helpers.reflect.findField
 import fuck.location.xposed.cellar.identity.Nr
 
 class Nr {
-    @RequiresApi(Build.VERSION_CODES.Q)
     fun constructNewCellInfoNr(existedCellInfoNr: CellInfoNr): CellInfoNr {
         val existedResultField = findField(existedCellInfoNr.javaClass) {
             name == "mCellIdentity"

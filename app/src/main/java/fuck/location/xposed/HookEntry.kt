@@ -14,15 +14,10 @@ import fuck.location.xposed.cellar.TelephonyRegistryHooker
 import fuck.location.xposed.helpers.ConfigGateway
 import fuck.location.xposed.helpers.workround.Miui
 import fuck.location.xposed.helpers.workround.Oplus
-import fuck.location.xposed.location.LocationHookerAfterS
-import fuck.location.xposed.location.LocationHookerPreQ
-import fuck.location.xposed.location.LocationHookerR
+import fuck.location.xposed.location.LocationHooker
 import fuck.location.xposed.location.WLANHooker
-import fuck.location.xposed.location.gnss.GnssHookerPreQ
-import fuck.location.xposed.location.gnss.GnssManagerServiceHookerR
-import fuck.location.xposed.location.gnss.GnssManagerServiceHookerS
-import fuck.location.xposed.location.miui.MiuiBlurLocationManagerHookerR
-import fuck.location.xposed.location.miui.MiuiBlurLocationManagerHookerS
+import fuck.location.xposed.location.gnss.GnssHooker
+import fuck.location.xposed.location.miui.MiuiBlurLocationHooker
 import fuck.location.xposed.location.oplus.NlpDLCS
 
 @ExperimentalStdlibApi
@@ -46,7 +41,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
         }
     }
 
-    @SuppressLint("PrivateApi", "ObsoleteSdkInt", "NewApi")
+    @SuppressLint("PrivateApi")
     override fun handleLoadPackage(lpparam: XC_LoadPackage.LoadPackageParam?) {
         if (lpparam == null) return
 
@@ -73,45 +68,17 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 step("config gateway (read)") { ConfigGateway.get().hookGetTagForIntentSender(lpparam) }
                 step("telephony registry") { TelephonyRegistryHooker().hookListen(lpparam) }
 
-                when {
-                    // Android 12 moved LocationProviderManager into
-                    // com.android.server.location.provider and 13 through 16 kept
-                    // that layout, so one hooker covers S and everything after it.
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-                        if (Miui().isMIUI()) {
-                            step("miui blurry location") {
-                                MiuiBlurLocationManagerHookerS().hookGetBlurryLocationS(lpparam)
-                            }
-                        } else if (Oplus().isOplus()) {
-                            step("oplus nlp") { NlpDLCS().hookColorOS(lpparam) }
-                        }
-
-                        step("last location") { LocationHookerAfterS().hookLastLocation(lpparam) }
-                        step("location DLC") { LocationHookerAfterS().hookDLC(lpparam) }
-                        step("gnss") {
-                            GnssManagerServiceHookerS().hookRegisterGnssNmeaCallback(lpparam)
-                        }
+                if (Miui().isMIUI()) {
+                    step("miui blurry location") {
+                        MiuiBlurLocationHooker().hookGetBlurryLocation(lpparam)
                     }
-
-                    Build.VERSION.SDK_INT == Build.VERSION_CODES.R -> {
-                        if (Miui().isMIUI()) {
-                            step("miui blurry location") {
-                                MiuiBlurLocationManagerHookerR().hookGetBlurryLocation(lpparam)
-                            }
-                        }
-
-                        step("last location") { LocationHookerR().hookLastLocation(lpparam) }
-                        step("location DLC") { LocationHookerR().hookDLC(lpparam) }
-                        step("gnss") {
-                            GnssManagerServiceHookerR().hookAddGnssBatchingCallback(lpparam)
-                        }
-                    }
-
-                    else -> {    // Android 10 and earlier
-                        step("last location") { LocationHookerPreQ().hookLastLocation(lpparam) }
-                        step("gnss") { GnssHookerPreQ().hookAddGnssBatchingCallback(lpparam) }
-                    }
+                } else if (Oplus().isOplus()) {
+                    step("oplus nlp") { NlpDLCS().hookColorOS(lpparam) }
                 }
+
+                step("last location") { LocationHooker().hookLastLocation(lpparam) }
+                step("location DLC") { LocationHooker().hookDLC(lpparam) }
+                step("gnss") { GnssHooker().hookGnssCallbacks(lpparam) }
 
                 step("wifi") { WLANHooker().hookWifiManager(lpparam) }
             }

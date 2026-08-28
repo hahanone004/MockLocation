@@ -3,9 +3,7 @@ package fuck.location.xposed.location.oplus
 import android.annotation.SuppressLint
 import android.location.Location
 import android.location.LocationManager
-import android.os.Build
 import android.util.ArrayMap
-import androidx.annotation.RequiresApi
 import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
@@ -15,7 +13,6 @@ import fuck.location.xposed.helpers.ConfigGateway
 class NlpDLCS {
     @SuppressLint("PrivateApi")
     @OptIn(ExperimentalStdlibApi::class)
-    @RequiresApi(Build.VERSION_CODES.S)
     fun hookColorOS(lpparam: XC_LoadPackage.LoadPackageParam) {
         val clazz = lpparam.classLoader.loadClass("com.android.server.location.OplusLocationManagerService")
 
@@ -42,7 +39,6 @@ class NlpDLCS {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.S)
     @OptIn(ExperimentalStdlibApi::class)
     private fun hookOnReportLocation(clazz: Class<*>, param: XC_MethodHook.MethodHookParam) {
         XposedBridge.log("FL: [Color] in onReportLocation!")
