@@ -9,6 +9,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.helpers.ConfigGateway
 
 class GnssHooker {
+    @OptIn(ExperimentalStdlibApi::class)
     @SuppressLint("PrivateApi")
     fun hookGnssCallbacks(lpparam: XC_LoadPackage.LoadPackageParam) {
         val clazz =

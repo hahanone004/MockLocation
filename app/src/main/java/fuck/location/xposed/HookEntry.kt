@@ -12,12 +12,10 @@ import fuck.location.BuildConfig
 import fuck.location.xposed.cellar.PhoneInterfaceManagerHooker
 import fuck.location.xposed.cellar.TelephonyRegistryHooker
 import fuck.location.xposed.helpers.ConfigGateway
-import fuck.location.xposed.helpers.workround.Miui
 import fuck.location.xposed.helpers.workround.Oplus
 import fuck.location.xposed.location.LocationHooker
 import fuck.location.xposed.location.WLANHooker
 import fuck.location.xposed.location.gnss.GnssHooker
-import fuck.location.xposed.location.miui.MiuiBlurLocationHooker
 import fuck.location.xposed.location.oplus.NlpDLCS
 
 @ExperimentalStdlibApi
@@ -68,11 +66,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 step("config gateway (read)") { ConfigGateway.get().hookGetTagForIntentSender(lpparam) }
                 step("telephony registry") { TelephonyRegistryHooker().hookListen(lpparam) }
 
-                if (Miui().isMIUI()) {
-                    step("miui blurry location") {
-                        MiuiBlurLocationHooker().hookGetBlurryLocation(lpparam)
-                    }
-                } else if (Oplus().isOplus()) {
+                if (Oplus().isOplus()) {
                     step("oplus nlp") { NlpDLCS().hookColorOS(lpparam) }
                 }
 
