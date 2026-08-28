@@ -20,6 +20,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         super.onCreate(savedInstanceState)
 
         ConfigGateway.get().setCustomContext(applicationContext)
+        ConfigGateway.get().migrateWhitelistIfNeeded()
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setModuleState(binding)

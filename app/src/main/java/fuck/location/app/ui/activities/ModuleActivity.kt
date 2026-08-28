@@ -14,7 +14,6 @@ import com.idanatz.oneadapter.external.modules.ItemModule
 import fuck.location.R
 import fuck.location.databinding.ActivitySelectAppsBinding
 import android.widget.ImageView
-import androidx.appcompat.content.res.AppCompatResources
 import androidx.appcompat.widget.SearchView
 import fuck.location.xposed.helpers.reflect.runOnMainThread
 import com.idanatz.oneadapter.external.event_hooks.ClickEventHook
@@ -103,40 +102,29 @@ class ModuleActivity : AppCompatActivity() {
     }
 
     private fun updateInstalledPackages() {
-        val storedList = ConfigGateway.get().readPackageList()
         val store = ConfigGateway.get().readProfileStore()
-        val checkCircle = AppCompatResources.getDrawable(this, R.drawable.baseline_check_circle_24)!!
         val displayNameComparator = ApplicationInfo.DisplayNameComparator(this.packageManager)
 
         packageInfos = this.packageManager.getInstalledPackages(0)
             .parallelStream().sorted { lhs, rhs ->
-                if (storedList != null) {
-                    val lChecked = storedList.contains(lhs.packageName)
-                    val rChecked = storedList.contains(rhs.packageName)
-                    when {
-                        lChecked == rChecked ->
-                            displayNameComparator.compare(lhs.applicationInfo, rhs.applicationInfo)
-                        lChecked -> -1
-                        else -> 1
-                    }
-                } else {
-                    displayNameComparator.compare(lhs.applicationInfo, rhs.applicationInfo)
+                // Apps being spoofed float to the top; the rest stay alphabetical.
+                val lAssigned = store.assignments.containsKey(lhs.packageName)
+                val rAssigned = store.assignments.containsKey(rhs.packageName)
+                when {
+                    lAssigned == rAssigned ->
+                        displayNameComparator.compare(lhs.applicationInfo, rhs.applicationInfo)
+                    lAssigned -> -1
+                    else -> 1
                 }
             }.filter { it.applicationInfo != null }    // null for packages we cannot fully see
             .map {
                 val applicationInfo = it.applicationInfo!!
                 val packageName = applicationInfo.packageName
-                val icon = if (storedList?.contains(packageName) == true) checkCircle
-                else applicationInfo.loadIcon(packageManager)
-
-                // Only a deviation from the default is worth showing.
-                val assigned = store.assignments[packageName]
-                    ?.let { id -> store.profiles.firstOrNull { it.id == id } }
 
                 AppListModel(applicationInfo.loadLabel(packageManager).toString(),
                     packageName,
-                    icon,
-                    assigned?.name.orEmpty())
+                    applicationInfo.loadIcon(packageManager),
+                    ProfileEditors.assignmentLabel(this, store, packageName))
             }.collect(Collectors.toList())
     }
 
@@ -160,8 +148,6 @@ class ModuleActivity : AppCompatActivity() {
         private val onProfileAssigned: (String) -> Unit,
     ) : ItemModule<AppListModel>() {
         init {
-            val selectedAppsList: MutableList<String> = ConfigGateway.get().readPackageList() as MutableList<String>
-
             config {
                 layoutResource = R.layout.app_list_model
             }
@@ -173,29 +159,13 @@ class ModuleActivity : AppCompatActivity() {
                 title.text = model.title
                 icon.setImageDrawable(model.icon)
 
-                profile.text = model.profileLabel.ifEmpty {
-                    context.getString(R.string.profile_use_default)
-                }
-                profile.setOnClickListener {
+                profile.text = model.profileLabel
+            }
+            eventHooks += ClickEventHook<AppListModel>().apply {
+                onClick { model, _, _ ->
                     ProfileEditors.assignProfile(context, model.packageName) {
                         onProfileAssigned(model.packageName)
                     }
-                }
-            }
-            eventHooks += ClickEventHook<AppListModel>().apply {
-                onClick { model, viewBinder, metadata ->
-                    val icon = viewBinder.findViewById<ImageView>(R.id.app_list_module_icon)
-                    if (selectedAppsList.contains(model.packageName)) {
-                        icon.setImageResource(R.drawable.baseline_radio_button_unchecked_24)
-                        model.icon = AppCompatResources.getDrawable(context, R.drawable.baseline_radio_button_unchecked_24)!!
-                        selectedAppsList.remove(model.packageName)
-                    } else {
-                        icon.setImageResource(R.drawable.baseline_check_circle_24)
-                        model.icon = AppCompatResources.getDrawable(context, R.drawable.baseline_check_circle_24)!!
-                        selectedAppsList.add(model.packageName)
-                    }
-
-                    ConfigGateway.get().writePackageList(selectedAppsList.toList())
                 }
             }
             onUnbind { model, viewBinder, metadata ->

@@ -10,22 +10,25 @@ package fuck.location.app.ui.models
 data class ProfileStore(
     val profiles: List<Profile> = listOf(Profile(id = Profile.DEFAULT_ID)),
     val defaultProfileId: String = Profile.DEFAULT_ID,
-    /** Package name to profile id. Absent means the app uses the default. */
+    /**
+     * Package name to profile id, or to [FOLLOW_DEFAULT]. An app that is absent
+     * is not intercepted at all, which is why this is the only gate: an app the
+     * user has never touched must never be spoofed.
+     */
     val assignments: Map<String, String> = emptyMap(),
     val configVersion: Int = CURRENT_CONFIG_VERSION,
 ) {
     /**
-     * The profile [packageName] should be spoofed with. Falls back to the
-     * default whenever an assignment points at a profile that has since been
-     * deleted, and to the first profile if the default id is dangling too, so a
-     * half-edited config still produces something usable.
+     * The profile [packageName] should be spoofed with, or null to leave the app
+     * alone. Falls back to the default whenever an assignment points at a
+     * profile that has since been deleted, and to the first profile if the
+     * default id is dangling too, so a half-edited config still works.
      */
     fun profileFor(packageName: String): Profile? {
-        assignments[packageName]?.let { assigned ->
-            profiles.firstOrNull { it.id == assigned }?.let { return it }
-        }
+        val assigned = assignments[packageName] ?: return null
+        if (assigned == FOLLOW_DEFAULT) return defaultProfile()
 
-        return defaultProfile()
+        return profiles.firstOrNull { it.id == assigned } ?: defaultProfile()
     }
 
     fun defaultProfile(): Profile? =
@@ -33,11 +36,18 @@ data class ProfileStore(
 
     companion object {
         /**
+         * Assignment value meaning "whatever the default profile is", so an app
+         * tracks the default instead of pinning the profile it happens to be.
+         */
+        const val FOLLOW_DEFAULT = "@default"
+
+        /**
          * 1: a bare {x, y} object.
          * 2: one flat object, offset in degrees, plus the LTE identity fields.
          * 3: named profiles, offset as a radius in metres, MCC/MNC and Wi-Fi.
+         * 4: assignments replace the separate whitelist.
          */
-        const val CURRENT_CONFIG_VERSION = 3
+        const val CURRENT_CONFIG_VERSION = 4
 
         /**
          * Folds a pre-profile config into a store holding a single default
@@ -58,7 +68,9 @@ data class ProfileStore(
                     earfcn = legacy.earfcn,
                     bandwidth = legacy.bandwidth,
                 )
-            )
+            ),
+            // Left at 3 so the whitelist is still folded into assignments.
+            configVersion = 3,
         )
     }
 }

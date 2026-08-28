@@ -44,11 +44,11 @@ class ConfigGateway private constructor() {
      * packageName is in whiteList.json or not.
      *
      * param.args[2] determines what this function will actually do:
-     * 0: input: packageName; output: true / false (in whiteList or not)
-     * 1: input: jsonString; output: void (writePackageList)
-     * 2: input: void; output: jsonString (readPackageList)
      * 3: input: jsonString; output: void (writeProfileStore)
-     * 4: input: void; output: jsonString (readProfileStore)
+     *
+     * Reads come back through getInstallerPackageName instead, keyed by magic
+     * number: the module's own one for the legacy whitelist, and
+     * magicNumberLocation for the profile store.
      */
 
     companion object {
@@ -78,23 +78,9 @@ class ConfigGateway private constructor() {
 
         methods.hookMethod {
             before { param ->
-                if (param.args[1] == magicNumber) {
-                    when {  // Check what this call intend to do
-                        param.args[2] == 0 -> {
-                            inWhitelistOrNot(param)
-                        }
-                        param.args[2] == 1 -> {
-                            writePackageListInternal(param)
-                        }
-                        param.args[2] == 3 -> {
-                            writeConfigInternal(param)
-                            return@before
-                        }
-                    }
-
+                if (param.args[1] == magicNumber && param.args[2] == 3) {
+                    writeConfigInternal(param)
                     return@before
-                } else {
-                    XposedBridge.log("FL: [debug !!] Not with magic number, do nothing.")
                 }
             }
         }
@@ -139,33 +125,6 @@ class ConfigGateway private constructor() {
         }
     }
 
-    @ExperimentalStdlibApi
-    private fun inWhitelistOrNot(param: XC_MethodHook.MethodHookParam) {
-        val packageName = param.args[0]
-
-        val jsonAdapter: JsonAdapter<List<String>> = Moshi.Builder().build().adapter()
-        val jsonFile = File("$dataDir/whiteList.json")
-
-        try {
-            val list = jsonAdapter.fromJson(jsonFile.readText())
-
-            // Compare the package itself. contains() also matched anything that
-            // merely had a whitelisted entry as a substring, so whitelisting
-            // "com.foo" silently caught "com.foo.other" and "notcom.foo" too.
-            val caller = packageName.toString().substringBefore(':')
-
-            if (list!!.any { it == caller }) {
-                param.result = true
-                return
-            }
-        } catch (e: Exception) {
-            XposedBridge.log("FL: [Track samsung !!] No whitelist file found. You may need to create one first $e")
-            e.printStackTrace()
-        }
-
-        param.result = false
-        return
-    }
 
     @ExperimentalStdlibApi
     private fun readPackageListInternal(param: XC_MethodHook.MethodHookParam) {
@@ -221,18 +180,6 @@ class ConfigGateway private constructor() {
         }
     }
 
-    private fun writePackageListInternal(param: XC_MethodHook.MethodHookParam) {
-        val jsonFile = File("$dataDir/whiteList.json")
-
-        if (!jsonFile.exists()) {
-            val jsonFileDirectory = File("$dataDir/")
-            jsonFileDirectory.mkdirs()
-        }
-
-        jsonFile.writeText(param.args[0] as String)
-
-        param.result = false    // Block from calling real method
-    }
 
     private fun writeConfigInternal(param: XC_MethodHook.MethodHookParam) {
         val jsonFile = File("$dataDir/fakeLocation.json")
@@ -278,22 +225,16 @@ class ConfigGateway private constructor() {
         }
     }
 
-    // For caller outside of framework
-    @SuppressLint("PrivateApi")
-    fun inWhitelist(packageName: String): Boolean {
-        return universalAPICaller(packageName, 0) as Boolean
-    }
-
     /*
-     * A hook needs three things to line up before it substitutes anything: the
-     * app is intercepted at all, a profile applies to it, and that profile has
-     * this particular spoof switched on. Each of these returns the profile to
-     * work from, or null to leave the caller alone.
+     * A hook needs two things to line up before it substitutes anything: a
+     * profile is assigned to the app, and that profile has this particular spoof
+     * switched on. Each of these returns the profile to work from, or null to
+     * leave the caller alone.
      */
 
     @ExperimentalStdlibApi
     fun profileFor(packageName: String): Profile? =
-        if (inWhitelist(packageName)) readProfileStore().profileFor(packageName) else null
+        readProfileStore().profileFor(packageName.substringBefore(':'))
 
     @ExperimentalStdlibApi
     fun locationSpoofFor(packageName: String): Profile? =
@@ -318,6 +259,41 @@ class ConfigGateway private constructor() {
         }
 
         return jsonAdapter.fromJson(json)
+    }
+
+    /**
+     * Folds a pre-version-4 whitelist into the assignment map, once.
+     *
+     * Interception used to need an app to be both whitelisted and assigned a
+     * profile, which meant assigning one to an unticked app silently did
+     * nothing. Assignment is now the only gate, so every previously whitelisted
+     * app becomes one that follows the default profile - the behaviour it
+     * already had.
+     *
+     * Call from the app, not from a hook: it writes.
+     */
+    @ExperimentalStdlibApi
+    fun migrateWhitelistIfNeeded() {
+        val store = readProfileStore()
+        if (store.configVersion >= ProfileStore.CURRENT_CONFIG_VERSION) return
+
+        val whitelisted = try {
+            readPackageList().orEmpty()
+        } catch (e: Exception) {
+            Log.w("No legacy whitelist to fold in: $e")
+            emptyList()
+        }
+
+        Log.i("Folding ${whitelisted.size} whitelisted package(s) into assignments")
+
+        writeProfileStore(
+            store.copy(
+                // Anything already assigned wins; this only fills the gaps.
+                assignments = whitelisted.associateWith { ProfileStore.FOLLOW_DEFAULT } +
+                    store.assignments,
+                configVersion = ProfileStore.CURRENT_CONFIG_VERSION,
+            )
+        )
     }
 
     @ExperimentalStdlibApi
@@ -362,13 +338,6 @@ class ConfigGateway private constructor() {
         return ProfileStore.fromLegacy(legacy)
     }
 
-    @ExperimentalStdlibApi
-    fun writePackageList(list: List<String>) {
-        val jsonAdapter: JsonAdapter<List<String>> = moshi.adapter()
-        val json: String = jsonAdapter.toJson(list)
-
-        universalAPICaller(json, 1)
-    }
 
     @ExperimentalStdlibApi
     fun writeProfileStore(store: ProfileStore) {

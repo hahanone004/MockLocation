@@ -5,6 +5,7 @@ import fuck.location.app.ui.models.Profile
 import fuck.location.app.ui.models.ProfileStore
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ProfileStoreTest {
@@ -15,7 +16,10 @@ class ProfileStoreTest {
     private val store = ProfileStore(
         profiles = listOf(taipei, shanghai),
         defaultProfileId = "taipei",
-        assignments = mapOf("com.example.mapped" to "shanghai"),
+        assignments = mapOf(
+            "com.example.mapped" to "shanghai",
+            "com.example.follower" to ProfileStore.FOLLOW_DEFAULT,
+        ),
     )
 
     @Test
@@ -24,8 +28,22 @@ class ProfileStoreTest {
     }
 
     @Test
-    fun `an unassigned app falls back to the default`() {
-        assertEquals(taipei, store.profileFor("com.example.other"))
+    fun `an app following the default gets the default profile`() {
+        assertEquals(taipei, store.profileFor("com.example.follower"))
+    }
+
+    @Test
+    fun `a follower tracks the default when it moves`() {
+        val moved = store.copy(defaultProfileId = "shanghai")
+
+        assertEquals(shanghai, moved.profileFor("com.example.follower"))
+    }
+
+    @Test
+    fun `an app that was never assigned is left alone`() {
+        // Assignment is the only gate, so an untouched app must never be
+        // spoofed just because a default profile exists.
+        assertNull(store.profileFor("com.example.untouched"))
     }
 
     @Test
@@ -39,12 +57,17 @@ class ProfileStoreTest {
     fun `a dangling default id falls back to the first profile`() {
         val broken = store.copy(defaultProfileId = "gone")
 
-        assertEquals(taipei, broken.profileFor("com.example.other"))
+        assertEquals(taipei, broken.profileFor("com.example.follower"))
     }
 
     @Test
     fun `an empty store resolves to nothing rather than throwing`() {
-        assertNull(ProfileStore(profiles = emptyList()).profileFor("com.example.other"))
+        val empty = ProfileStore(
+            profiles = emptyList(),
+            assignments = mapOf("com.example.follower" to ProfileStore.FOLLOW_DEFAULT),
+        )
+
+        assertNull(empty.profileFor("com.example.follower"))
     }
 
     @Test
@@ -52,7 +75,7 @@ class ProfileStoreTest {
         val legacy = LegacyFakeLocation(x = 24.9581, y = 121.2198, eci = 81564174, tac = 13400)
         val migrated = ProfileStore.fromLegacy(legacy)
 
-        val profile = migrated.profileFor("com.example.any")!!
+        val profile = migrated.defaultProfile()!!
         assertEquals(24.9581, profile.x, 1e-9)
         assertEquals(121.2198, profile.y, 1e-9)
         assertEquals(81564174, profile.eci)
@@ -67,8 +90,16 @@ class ProfileStoreTest {
 
         assertEquals(
             0.5 * Profile.METRES_PER_DEGREE / 2,
-            migrated.profileFor("com.example.any")!!.offset,
+            migrated.defaultProfile()!!.offset,
             1e-6,
         )
+    }
+
+    @Test
+    fun `a legacy config still asks to be migrated`() {
+        // It carries no assignments, so the whitelist has yet to be folded in
+        // and the version must stay below current for that to happen.
+        assertTrue(ProfileStore.fromLegacy(LegacyFakeLocation()).configVersion
+            < ProfileStore.CURRENT_CONFIG_VERSION)
     }
 }
