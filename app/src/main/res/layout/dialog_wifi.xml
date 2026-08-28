@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_wifi_list" />
+
+    <EditText
+        android:id="@+id/field_wifi_list"
+        style="@style/FieldInput"
+        android:gravity="top|start"
+        android:inputType="textMultiLine|textNoSuggestions"
+        android:minLines="6"
+        android:textSize="15sp"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView
+        style="@style/FieldLabel"
+        android:text="@string/field_wifi_hint" />
+</LinearLayout>

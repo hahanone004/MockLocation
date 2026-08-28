@@ -2,10 +2,44 @@
     <string name="app_name">Fuck Location</string>
     <string name="select_apps_activity_title">选择应用</string>
 
-    <string name="title_fucklocation_test">测试设定</string>
     <string name="title_fucklocation_credit">位置白名单</string>
-    <string name="title_fucklocation_settings">设置</string>
     <string name="title_fucklocation_about">关于本模块</string>
+
+    <string name="title_profiles">配置管理</string>
+    <string name="title_location_spoof">位置伪装</string>
+    <string name="title_cell_spoof">基站伪装</string>
+    <string name="title_wifi_spoof">WiFi 伪装</string>
+
+    <string name="action_save">保存</string>
+    <string name="action_discard">不保存</string>
+    <string name="action_ok">知道了</string>
+
+    <string name="dialog_location_title">位置伪装 \u2014 %s</string>
+    <string name="dialog_cell_title">基站伪装 \u2014 %s</string>
+    <string name="dialog_wifi_title">WiFi 伪装 \u2014 %s</string>
+
+    <string name="field_latitude">纬度</string>
+    <string name="field_longitude">经度</string>
+    <string name="field_offset">抖动半径（米）</string>
+    <string name="field_offset_hint">每次请求都会落在这个米数的范围内随机一点。填 0 则返回精确坐标。</string>
+
+    <string name="field_eci_hint">ECI 与下面两项描述的是同一个小区，改动任意一边另一边会跟着变。</string>
+    <string name="field_bandwidth">带宽</string>
+
+    <string name="field_wifi_list">热点列表</string>
+    <string name="field_wifi_hint">每行一个：名称 | BSSID | 信号 dBm | 频率 MHz。只有名称是必填的。列表留空会让应用一个 WiFi 都扫不到，这本身也很可疑。</string>
+
+    <string name="profile_label_default">%s（默认）</string>
+    <string name="profile_action_new">新建配置</string>
+    <string name="profile_action_default">设为默认</string>
+    <string name="profile_action_rename">重命名</string>
+    <string name="profile_action_delete">删除</string>
+    <string name="profile_name_hint">配置名称</string>
+    <string name="profile_unnamed">未命名配置</string>
+    <string name="profile_delete_last">只剩这一个配置了，不能删除。</string>
+    <string name="profile_delete_confirm">指派到该配置的应用会回到默认配置。</string>
+    <string name="profile_use_default">默认</string>
+    <string name="profile_assign_title">为该应用选择配置</string>
 
     <string name="card_title_not_activated">模块未激活</string>
     <string name="card_detail_not_activated">请检查你是否已经正确激活了模块</string>
@@ -14,18 +48,7 @@
     <string name="card_detail_activated">请前往“设置”以对模块进行进一步设定</string>
     <string name="card_serve_time">已合计为您服务 0 次</string>
 
-    <string name="dialog_not_available_dialog">暂未写好</string>
-    <string name="dialog_not_available_content">前面的区域，以后再来探索吧</string>
-
     <string name="system_app">系统应用</string>
-    <string name="custom_location_dialog">定位坐标</string>
-    <string name="custom_location_dialog_save">保存</string>
-    <string name="custom_location_dialog_notsave">不保存</string>
-
-    <string name="custom_view_textview_x">纬度</string>
-    <string name="custom_view_textview_y">经度</string>
-    <string name="custom_view_textview_offset">偏移范围</string>
-    <string name="custom_view_textview_bandwidth">Bandwidth</string>
 
     <string name="about_slogan">关于该模块</string>
     <string name="about_introduction_title">关于和帮助</string>

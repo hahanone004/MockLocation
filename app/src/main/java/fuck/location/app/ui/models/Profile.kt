@@ -1,0 +1,100 @@
+package fuck.location.app.ui.models
+
+import kotlin.math.PI
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.sqrt
+
+/**
+ * One named spoofed environment: where the device claims to be, which LTE cell
+ * it claims to be camped on, and which access points it claims to see.
+ *
+ * The three go together on purpose. A profile describes one place, so an app
+ * cannot end up reporting a Taipei position while camped on a Shanghai cell,
+ * which is exactly the kind of inconsistency a cross-check would catch.
+ *
+ * Every field carries a default so Moshi can read a profile written by an older
+ * build of the module.
+ */
+data class Profile(
+    val id: String = DEFAULT_ID,
+    val name: String = "",
+
+    /** Each spoof is switched on independently within the profile. */
+    val locationEnabled: Boolean = true,
+    val cellEnabled: Boolean = true,
+    val wifiEnabled: Boolean = true,
+
+    /** Latitude of the cell, and the position GPS reports. */
+    val x: Double = 0.0,
+    /** Longitude of the cell, and the position GPS reports. */
+    val y: Double = 0.0,
+    /** Jitter radius in metres; 0 reports the exact position. */
+    val offset: Double = 0.0,
+
+    val mcc: String = "",
+    val mnc: String = "",
+    val tac: Int = 0,
+    /** 28-bit LTE cell identity: (eNodeB id shl 8) or sector id. */
+    val eci: Int = 0,
+    val pci: Int = 0,
+    val earfcn: Int = 0,
+    val bandwidth: Int = 0,
+
+    val wifiAccessPoints: List<FakeAccessPoint> = emptyList(),
+) {
+    /**
+     * A position drawn uniformly from the disc of radius [offset] around the
+     * configured point. Returns latitude to longitude.
+     *
+     * Longitude degrees shrink with latitude, so the east-west component is
+     * divided by cos(latitude); without that a "50 m" jitter in Helsinki would
+     * only move you about 25 m east.
+     */
+    fun jitteredPosition(): Pair<Double, Double> {
+        if (offset <= 0.0) return x to y
+
+        // sqrt keeps the draw uniform over the disc rather than clustered
+        // around the centre.
+        val angle = Math.random() * 2 * PI
+        val radius = offset * sqrt(Math.random())
+
+        val latitude = x + (radius * cos(angle)) / METRES_PER_DEGREE
+
+        // Guard the poles, where a metre of easting spans arbitrarily many
+        // degrees and the division blows up.
+        val shrink = cos(x * PI / 180)
+        val longitude = if (abs(shrink) < 1e-6) y
+        else y + (radius * sin(angle)) / (METRES_PER_DEGREE * shrink)
+
+        return latitude to longitude
+    }
+
+    /** Upper 20 bits of the ECI: which base station. */
+    val eNodeBId: Int get() = eci ushr 8
+
+    /** Lower 8 bits of the ECI: which sector of that base station. */
+    val sectorId: Int get() = eci and 0xFF
+
+    companion object {
+        const val DEFAULT_ID = "default"
+
+        /** Metres per degree of latitude, near enough anywhere on the globe. */
+        const val METRES_PER_DEGREE = 111_320.0
+
+        fun eciOf(eNodeBId: Int, sectorId: Int): Int =
+            ((eNodeBId and 0xFFFFF) shl 8) or (sectorId and 0xFF)
+    }
+}
+
+/** One access point to report to apps using the owning profile. */
+data class FakeAccessPoint(
+    val ssid: String = "",
+    val bssid: String = "",
+    /** Signal strength in dBm; -50 is a strong nearby AP. */
+    val level: Int = -50,
+    /** Centre frequency in MHz; 2437 is 2.4 GHz channel 6. */
+    val frequency: Int = 2437,
+    val capabilities: String = "[WPA2-PSK-CCMP][ESS]",
+)

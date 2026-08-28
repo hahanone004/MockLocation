@@ -30,7 +30,7 @@ class PhoneInterfaceManagerHooker {
 
                 XposedBridge.log("FL: [Cellar] in getImeiForSlot! Caller package name: $packageName")
 
-                if (ConfigGateway.get().inWhitelist(packageName)) {
+                if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
                     param.result = customIMEI
                     XposedBridge.log("FL: [Cellar] In whiteList! Return custom value for testing purpose: $customIMEI")
                 }
@@ -45,9 +45,8 @@ class PhoneInterfaceManagerHooker {
                 val customMEID = "1234567891011120" // TODO: Support custom MEID information
 
                 XposedBridge.log("FL: [Cellar] in getMeidForSlot! Caller package name: $packageName")
-                if (ConfigGateway.get().inWhitelist(packageName)) {
+                if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
                     param.result = customMEID
-                    ConfigGateway.get().inWhitelist(param.args[1] as String)
                     XposedBridge.log("FL: [Cellar] In whiteList! Return custom value for testing purpose: $customMEID")
                 }
             }
@@ -60,28 +59,23 @@ class PhoneInterfaceManagerHooker {
                 val packageName = param.args[0] as String
                 XposedBridge.log("FL: [Cellar] in getCellLocation! Caller package name: $packageName")
 
-                if (ConfigGateway.get().inWhitelist(packageName)) {
+                val profile = ConfigGateway.get().cellSpoofFor(packageName)
+                if (profile != null) {
                     XposedBridge.log("FL: [Cellar] in whiteList! Return custom cell data information")
 
                     when (param.result) {
                         is CellIdentityLte -> {
                             XposedBridge.log("FL: [Cellar] Using LTE Network...")
-                            param.result = Lte().alterCellIdentity(param.result as CellIdentityLte)
+                            param.result = Lte().alterCellIdentity(param.result as CellIdentityLte, profile)
                         }
                         is CellIdentityNr -> {
                             XposedBridge.log("FL: [Cellar] Using Nr Network...")
-                            param.result = Nr().alterCellIdentity(param.result as CellIdentityNr)
+                            param.result = Nr().alterCellIdentity(param.result as CellIdentityNr, profile)
                         }
                         else -> {
                             XposedBridge.log("FL: [Cellar] Unsupported network type. Return null as fallback")
                             param.result = null
                         }
-                    }
-
-                    // Android 9 does not have this network type
-                    if (param.result is CellIdentityNr) {
-                        XposedBridge.log("FL: [Cellar] Using NR Network...")
-                        param.result = Nr().alterCellIdentity(param.result as CellIdentityNr)
                     }
                 }
             }
@@ -94,7 +88,7 @@ class PhoneInterfaceManagerHooker {
                 val packageName = param.args[0] as String
                 XposedBridge.log("FL: [Cellar] in getAllCellInfo! Caller package name: $packageName")
 
-                if (ConfigGateway.get().inWhitelist(packageName)) {
+                if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
                     XposedBridge.log("FL: [Cellar] in whiteList! Return empty AllCellInfo for testing purpose.")
                     val customAllCellInfo = ArrayList<CellInfo>()
                     param.result = customAllCellInfo
@@ -109,7 +103,7 @@ class PhoneInterfaceManagerHooker {
                 val packageName = param.args[0] as String
                 XposedBridge.log("FL: [Cellar] in getNeighboringCellInfo! Caller package name: $packageName")
 
-                if (ConfigGateway.get().inWhitelist(packageName)) {
+                if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
                     XposedBridge.log("FL: [Cellar] in whiteList! Return empty NeighboringCellInfo for testing purpose.")
                     val customNeighboringCellInfo = ArrayList<NeighboringCellInfo>()
                     param.result = customNeighboringCellInfo
@@ -123,7 +117,7 @@ class PhoneInterfaceManagerHooker {
             val packageName = param.args[2] as String
             XposedBridge.log("FL: [Cellar] in requestCellInfoUpdateInternal! Caller package name: $packageName")
 
-            if (ConfigGateway.get().inWhitelist(packageName)) {
+            if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
                 XposedBridge.log("FL: in whiteList! Dropping register request...")
                 param.result = null
                 return@hookBefore

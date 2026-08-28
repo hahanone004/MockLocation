@@ -3,10 +3,52 @@
     <string name="app_name">Fuck Location</string>
     <string name="select_apps_activity_title">Select Apps</string>
 
-    <string name="title_fucklocation_test">Test settings</string>
     <string name="title_fucklocation_credit">Location whitelist</string>
-    <string name="title_fucklocation_settings">Settings</string>
     <string name="title_fucklocation_about">About this module</string>
+
+    <string name="title_profiles">Profiles</string>
+    <string name="title_location_spoof">Location</string>
+    <string name="title_cell_spoof">Cell tower</string>
+    <string name="title_wifi_spoof">Wi-Fi</string>
+
+    <string name="action_save">Save</string>
+    <string name="action_discard">Discard</string>
+    <string name="action_ok">OK</string>
+
+    <string name="dialog_location_title">Location \u2014 %s</string>
+    <string name="dialog_cell_title">Cell tower \u2014 %s</string>
+    <string name="dialog_wifi_title">Wi-Fi \u2014 %s</string>
+
+    <string name="field_latitude">Latitude</string>
+    <string name="field_longitude">Longitude</string>
+    <string name="field_offset">Jitter radius (metres)</string>
+    <string name="field_offset_hint">Each request lands somewhere random within this many metres. 0 reports the exact point.</string>
+
+    <string name="field_mcc" translatable="false">MCC</string>
+    <string name="field_mnc" translatable="false">MNC</string>
+    <string name="field_tac" translatable="false">TAC</string>
+    <string name="field_eci" translatable="false">Cell ID / ECI</string>
+    <string name="field_eci_hint">The ECI and the two fields below describe the same cell, so editing either updates the other.</string>
+    <string name="field_enodeb" translatable="false">eNodeB ID</string>
+    <string name="field_sector" translatable="false">Sector ID</string>
+    <string name="field_pci" translatable="false">PCI</string>
+    <string name="field_earfcn" translatable="false">EARFCN</string>
+    <string name="field_bandwidth">Bandwidth</string>
+
+    <string name="field_wifi_list">Access points</string>
+    <string name="field_wifi_hint">One per line: name | BSSID | signal dBm | frequency MHz. Only the name is required. An empty list reports no networks at all, which is itself conspicuous.</string>
+
+    <string name="profile_label_default">%s (default)</string>
+    <string name="profile_action_new">New profile</string>
+    <string name="profile_action_default">Use as default</string>
+    <string name="profile_action_rename">Rename</string>
+    <string name="profile_action_delete">Delete</string>
+    <string name="profile_name_hint">Profile name</string>
+    <string name="profile_unnamed">Unnamed profile</string>
+    <string name="profile_delete_last">This is the only profile left, so it cannot be deleted.</string>
+    <string name="profile_delete_confirm">Apps assigned to this profile go back to the default.</string>
+    <string name="profile_use_default">Default</string>
+    <string name="profile_assign_title">Profile for this app</string>
 
     <string name="card_title_not_activated">Not activated</string>
     <string name="card_detail_not_activated">Make sure you have correctly set up this module</string>
@@ -15,22 +57,7 @@
     <string name="card_detail_activated">Go settings for further set up</string>
     <string name="card_serve_time">Served for 0 times</string>
 
-    <string name="dialog_not_available_dialog">Not available</string>
-    <string name="dialog_not_available_content">Coming soon :)</string>
-
     <string name="system_app">System apps</string>
-    <string name="custom_location_dialog">Location</string>
-    <string name="custom_location_dialog_save">Save</string>
-    <string name="custom_location_dialog_notsave">Discard</string>
-
-    <string name="custom_view_textview_x">Latitude</string>
-    <string name="custom_view_textview_y">Longitude</string>
-    <string name="custom_view_textview_offset">Offset</string>
-    <string name="custom_view_textview_ci" translatable="false">ECI / NCI</string>
-    <string name="custom_view_textview_pci" translatable="false">Pci</string>
-    <string name="custom_view_textview_tac" translatable="false">Tac</string>
-    <string name="custom_view_textview_arfcn" translatable="false">Earfcn / nrArfcn</string>
-    <string name="custom_view_textview_bandwidth">Bandwidth</string>
 
     <string name="about_slogan">About this module</string>
     <string name="about_introduction_title">Tips and help</string>

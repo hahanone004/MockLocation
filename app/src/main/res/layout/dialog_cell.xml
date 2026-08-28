@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_mcc" />
+
+    <EditText
+        android:id="@+id/field_mcc"
+        style="@style/FieldInput"
+        android:inputType="number"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_mnc" />
+
+    <EditText
+        android:id="@+id/field_mnc"
+        style="@style/FieldInput"
+        android:inputType="number"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_tac" />
+
+    <EditText
+        android:id="@+id/field_tac"
+        style="@style/FieldInput"
+        android:inputType="number"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_eci" />
+
+    <EditText
+        android:id="@+id/field_eci"
+        style="@style/FieldInput"
+        android:inputType="number"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView
+        style="@style/FieldLabel"
+        android:text="@string/field_eci_hint" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_enodeb" />
+
+    <EditText
+        android:id="@+id/field_enodeb"
+        style="@style/FieldInput"
+        android:inputType="number"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_sector" />
+
+    <EditText
+        android:id="@+id/field_sector"
+        style="@style/FieldInput"
+        android:inputType="number"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_pci" />
+
+    <EditText
+        android:id="@+id/field_pci"
+        style="@style/FieldInput"
+        android:inputType="number"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_earfcn" />
+
+    <EditText
+        android:id="@+id/field_earfcn"
+        style="@style/FieldInput"
+        android:inputType="number"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_bandwidth" />
+
+    <EditText
+        android:id="@+id/field_bandwidth"
+        style="@style/FieldInput"
+        android:inputType="number"
+        tools:ignore="Autofill,LabelFor" />
+</LinearLayout>

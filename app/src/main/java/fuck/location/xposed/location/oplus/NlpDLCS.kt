@@ -59,7 +59,8 @@ class NlpDLCS {
 
             val packageName = ConfigGateway.get().callerIdentityToPackageName(callerIdentity!!)
 
-            if (!ConfigGateway.get().inWhitelist(packageName)) {
+            val profile = ConfigGateway.get().locationSpoofFor(packageName)
+            if (profile == null) {
                 newRegistrations[registration.key] = registration.value
             } else {
                 val value = registration.value
@@ -72,13 +73,13 @@ class NlpDLCS {
                 mLocationsField.isAccessible = true
                 val mLocations = mLocationsField.get(locationResult) as ArrayList<*>
 
-                val originLocation = (mLocations[0] as Location).takeIf { mLocations.isNotEmpty() } ?: Location(LocationManager.GPS_PROVIDER)
-                val fakeLocation = ConfigGateway.get().readFakeLocation()
+                val originLocation = mLocations.firstOrNull() as? Location ?: Location(LocationManager.GPS_PROVIDER)
 
                 val location = Location(originLocation.provider)
 
-                location.latitude = fakeLocation.x + (Math.random() * fakeLocation.offset - fakeLocation.offset / 2)
-                location.longitude = fakeLocation.y + (Math.random() * fakeLocation.offset - fakeLocation.offset / 2)
+                val (latitude, longitude) = profile.jitteredPosition()
+                location.latitude = latitude
+                location.longitude = longitude
                 location.isMock = false
                 location.altitude = 0.0
                 location.speed = 0F

@@ -20,7 +20,7 @@ class GnssHooker {
             val packageName = param.args[1] as String
             XposedBridge.log("FL: in registerGnssStatusCallback! Caller package name: $packageName")
 
-            if (ConfigGateway.get().inWhitelist(packageName)) {
+            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
                 XposedBridge.log("FL: in whiteList! Dropping register request...")
                 param.result = null
                 return@hookBefore
@@ -33,7 +33,7 @@ class GnssHooker {
             val packageName = param.args[1] as String
             XposedBridge.log("FL: in registerGnssNmeaCallback! Caller package name: $packageName")
 
-            if (ConfigGateway.get().inWhitelist(packageName)) {
+            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
                 XposedBridge.log("FL: in whiteList! Dropping register request...")
                 param.result = null
                 return@hookBefore
@@ -46,7 +46,7 @@ class GnssHooker {
             val packageName = param.args[2] as String
             XposedBridge.log("FL: in addGnssMeasurementsListener! Caller package name: $packageName")
 
-            if (ConfigGateway.get().inWhitelist(packageName)) {
+            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
                 XposedBridge.log("FL: in whiteList! Dropping register request...")
                 param.result = null
                 return@hookBefore
@@ -59,7 +59,7 @@ class GnssHooker {
             val packageName = param.args[1] as String
             XposedBridge.log("FL: in addGnssNavigationMessageListener! Caller package name: $packageName")
 
-            if (ConfigGateway.get().inWhitelist(packageName)) {
+            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
                 XposedBridge.log("FL: in whiteList! Dropping register request...")
                 param.result = null
                 return@hookBefore
@@ -72,7 +72,7 @@ class GnssHooker {
             val packageName = param.args[1] as String
             XposedBridge.log("FL: in addGnssAntennaInfoListener! Caller package name: $packageName")
 
-            if (ConfigGateway.get().inWhitelist(packageName)) {
+            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
                 XposedBridge.log("FL: in whiteList! Dropping register request...")
                 param.result = null
                 return@hookBefore

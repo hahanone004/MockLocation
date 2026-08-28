@@ -33,7 +33,8 @@ class TelephonyRegistryHooker {
 
             val shouldReportOrigin = param.result as Boolean
 
-            if (ConfigGateway.get().inWhitelist(packageName) && shouldReportOrigin) {
+            val profile = ConfigGateway.get().cellSpoofFor(packageName)
+            if (profile != null && shouldReportOrigin) {
                 val callBack = findField(record.javaClass) {
                     name == "callback"
                 }.get(record)
@@ -60,7 +61,7 @@ class TelephonyRegistryHooker {
                                                     name == "onCellLocationChanged"
                                                 }.invoke(
                                                     callBack,
-                                                    Lte().alterCellIdentity(originalCellIdentity)
+                                                    Lte().alterCellIdentity(originalCellIdentity, profile)
                                                 )
                                             }
                                             is CellIdentityNr -> {
@@ -68,7 +69,7 @@ class TelephonyRegistryHooker {
                                                     name == "onCellLocationChanged"
                                                 }.invoke(
                                                     callBack,
-                                                    Nr().alterCellIdentity(originalCellIdentity)
+                                                    Nr().alterCellIdentity(originalCellIdentity, profile)
                                                 )
                                             }
                                             else -> {
@@ -109,13 +110,13 @@ class TelephonyRegistryHooker {
                                                     is CellInfoLte -> {
                                                         modifiedCellInfoList.add(
                                                             fuck.location.xposed.cellar.info.Lte()
-                                                                .constructNewCellInfoLte(cellInfo)
+                                                                .constructNewCellInfoLte(cellInfo, profile)
                                                         )
                                                     }
                                                     is CellInfoNr -> {
                                                         modifiedCellInfoList.add(
                                                             fuck.location.xposed.cellar.info.Nr()
-                                                                .constructNewCellInfoNr(cellInfo)
+                                                                .constructNewCellInfoNr(cellInfo, profile)
                                                         )
                                                     }
                                                 }
@@ -162,7 +163,7 @@ class TelephonyRegistryHooker {
                     name == "callingPackage"
                 }.get(record) as String
 
-                if (!ConfigGateway.get().inWhitelist(packageName)) {
+                if (ConfigGateway.get().cellSpoofFor(packageName) == null) {
                     newRecords.add(record)
                 }
             }

@@ -69,4 +69,21 @@
     <style name="DefaultText.Option.Card">
         <item name="android:textSize">18sp</item>
     </style>
+
+    <!-- Label and input pairs inside the profile editor dialogs -->
+    <style name="FieldLabel">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">18dp</item>
+        <item name="android:textColor">?android:textColorSecondary</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="FieldInput">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_marginTop">4dp</item>
+        <item name="android:textColor">?android:textColorPrimary</item>
+        <item name="android:textSize">18sp</item>
+    </style>
 </resources>

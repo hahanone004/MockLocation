@@ -191,15 +191,31 @@ fun runOnMainThread(action: () -> Unit) {
     else mainHandler.post { action() }
 }
 
-/** Xposed-log shim; [Log.d] etc. keep the call sites in ConfigGateway unchanged. */
+/**
+ * Logs to the Xposed log when there is one.
+ *
+ * The same classes run inside the module's own app process, where the Xposed
+ * API is only provided if the module is actually activated. Touching
+ * XposedBridge there throws NoClassDefFoundError - an Error, not an Exception,
+ * so ordinary catch blocks let it through - which used to take the settings UI
+ * down on a phone without a working Xposed framework. Fall back to logcat.
+ */
 object Log {
     var tag: String = "FuckLocation"
 
-    fun d(message: String) = XposedBridge.log("$tag/D: $message")
-    fun i(message: String) = XposedBridge.log("$tag/I: $message")
-    fun w(message: String) = XposedBridge.log("$tag/W: $message")
+    fun d(message: String) = write("D", message)
+    fun i(message: String) = write("I", message)
+    fun w(message: String) = write("W", message)
     fun e(message: String, throwable: Throwable? = null) =
-        XposedBridge.log("$tag/E: $message${throwable?.let { " $it" } ?: ""}")
+        write("E", message + (throwable?.let { " $it" } ?: ""))
+
+    private fun write(level: String, message: String) {
+        try {
+            XposedBridge.log("$tag/$level: $message")
+        } catch (t: Throwable) {
+            android.util.Log.d(tag, "$level: $message")
+        }
+    }
 }
 
 // endregion

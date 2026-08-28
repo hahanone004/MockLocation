@@ -13,8 +13,9 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
-import fuck.location.app.ui.models.FakeLocation
-import fuck.location.app.ui.models.FakeLocationHistory
+import fuck.location.app.ui.models.LegacyFakeLocation
+import fuck.location.app.ui.models.Profile
+import fuck.location.app.ui.models.ProfileStore
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.io.File
 import java.io.FileNotFoundException
@@ -32,6 +33,9 @@ class ConfigGateway private constructor() {
     private val magicNumber = -114514
     private val magicNumberLocation = -191931
 
+    // Every ProfileStore field has a default, so this parses into a usable config
+    private val EMPTY_CONFIG = "{}"
+
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private lateinit var dataDir: String
     private lateinit var customContext: Context
@@ -43,8 +47,8 @@ class ConfigGateway private constructor() {
      * 0: input: packageName; output: true / false (in whiteList or not)
      * 1: input: jsonString; output: void (writePackageList)
      * 2: input: void; output: jsonString (readPackageList)
-     * 3: input: jsonString; output: void (writeFakeLocation)
-     * 4: input: void; output: jsonString (readFakeLocation)
+     * 3: input: jsonString; output: void (writeProfileStore)
+     * 4: input: void; output: jsonString (readProfileStore)
      */
 
     companion object {
@@ -83,7 +87,7 @@ class ConfigGateway private constructor() {
                             writePackageListInternal(param)
                         }
                         param.args[2] == 3 -> {
-                            writeFakeLocationInternal(param)
+                            writeConfigInternal(param)
                             return@before
                         }
                     }
@@ -126,7 +130,7 @@ class ConfigGateway private constructor() {
                         readPackageListInternal(param)
                     }
                     param.args[0] == magicNumberLocation.toString() -> {
-                        readFakeLocationInternal(param)
+                        readConfigInternal(param)
                         return@before
                     }
                 }
@@ -185,7 +189,8 @@ class ConfigGateway private constructor() {
     }
 
     @ExperimentalStdlibApi
-    private fun readFakeLocationInternal(param: XC_MethodHook.MethodHookParam) {
+    private fun readConfigInternal(param: XC_MethodHook.MethodHookParam) {
+        // Name kept from before profiles existed so upgrades find the config
         var jsonFile = File("$dataDir/fakeLocation.json")
 
         try {
@@ -203,16 +208,16 @@ class ConfigGateway private constructor() {
                     jsonFile.readText()
                     Log.d("FL: fakeLocation.json resumed.")
                 } catch (e: FileNotFoundException) {
-                    Log.d("FL: not possible to refresh. Fallback to {\"x\":0.0, \"y\":0.0, \"eci\":0, \"pci\":0, \"tac\":0, \"earfcn\":0, \"bandwidth\":0}")
+                    Log.d("FL: not possible to refresh. Falling back to defaults")
                 }
-                "{\"x\":0.0, \"y\":0.0, \"eci\":0, \"pci\":0, \"tac\":0, \"earfcn\":0, \"bandwidth\":0}"
+                EMPTY_CONFIG
             }
 
             param.result = json
         } catch (e: Exception) {
             XposedBridge.log("FL: [debug !!] Fuck with exceptions! $e")
 
-            param.result = "{\"x\":0.0, \"y\":0.0, \"eci\":0, \"pci\":0, \"tac\":0, \"earfcn\":0, \"bandwidth\":0}"
+            param.result = EMPTY_CONFIG
         }
     }
 
@@ -229,7 +234,7 @@ class ConfigGateway private constructor() {
         param.result = false    // Block from calling real method
     }
 
-    private fun writeFakeLocationInternal(param: XC_MethodHook.MethodHookParam) {
+    private fun writeConfigInternal(param: XC_MethodHook.MethodHookParam) {
         val jsonFile = File("$dataDir/fakeLocation.json")
 
         if (!jsonFile.exists()) {
@@ -279,13 +284,36 @@ class ConfigGateway private constructor() {
         return universalAPICaller(packageName, 0) as Boolean
     }
 
+    /*
+     * A hook needs three things to line up before it substitutes anything: the
+     * app is intercepted at all, a profile applies to it, and that profile has
+     * this particular spoof switched on. Each of these returns the profile to
+     * work from, or null to leave the caller alone.
+     */
+
+    @ExperimentalStdlibApi
+    fun profileFor(packageName: String): Profile? =
+        if (inWhitelist(packageName)) readProfileStore().profileFor(packageName) else null
+
+    @ExperimentalStdlibApi
+    fun locationSpoofFor(packageName: String): Profile? =
+        profileFor(packageName)?.takeIf { it.locationEnabled }
+
+    @ExperimentalStdlibApi
+    fun cellSpoofFor(packageName: String): Profile? =
+        profileFor(packageName)?.takeIf { it.cellEnabled }
+
+    @ExperimentalStdlibApi
+    fun wifiSpoofFor(packageName: String): Profile? =
+        profileFor(packageName)?.takeIf { it.wifiEnabled }
+
     @ExperimentalStdlibApi
     fun readPackageList(): List<String>? {
         val jsonAdapter: JsonAdapter<List<String>> = moshi.adapter()
         val json = try {
             universalAPICaller("None", 2) as String
         } catch (e: Exception) {
-            XposedBridge.log("FL: Failed to read package list. Fallback to []")
+            Log.w("Failed to read package list, falling back to []")
             "[]"
         }
 
@@ -293,39 +321,45 @@ class ConfigGateway private constructor() {
     }
 
     @ExperimentalStdlibApi
-    fun readFakeLocation(): FakeLocation {
-        val jsonAdapter: JsonAdapter<FakeLocation> = moshi.adapter()
+    fun readProfileStore(): ProfileStore {
         val json = try {
             universalAPICaller("None", 4) as String
         } catch (e: Exception) {
-            XposedBridge.log("FL: Failed to read fake location. Fallback to {\"x\":0.0, \"y\":0.0, \"eci\":0, \"pci\":0, \"tac\":0, \"earfcn\":0, \"bandwidth\":0}")
-            "{\"x\":0.0, \"y\":0.0, \"eci\":0, \"pci\":0, \"tac\":0, \"earfcn\":0, \"bandwidth\":0}"
+            Log.w("Failed to read profiles, falling back to defaults")
+            EMPTY_CONFIG
         }
 
-        lateinit var jsonAdapterResult : FakeLocation
+        return try {
+            parseProfileStore(json)
+        } catch (e: Exception) {
+            // A malformed config must not take the module down with it: report
+            // it and behave as if nothing were configured.
+            Log.w("Config is unreadable, falling back to defaults: $e")
+            ProfileStore()
+        }
+    }
 
-        // Migrate from older config
-        try {
-            jsonAdapterResult = jsonAdapter.fromJson(json)!!
-        } catch (e: JsonDataException) {
-            val jsonAdapterMigrate: JsonAdapter<FakeLocationHistory> = moshi.adapter()
-            val oldJsonAdapterResult = jsonAdapterMigrate.fromJson(json)
+    /**
+     * Reads either shape of config. Everything before profiles was one flat
+     * object, and since every field of [ProfileStore] has a default, a legacy
+     * config would otherwise parse "successfully" into an empty store and throw
+     * the user's settings away. Look for the profiles key to tell them apart.
+     */
+    @ExperimentalStdlibApi
+    private fun parseProfileStore(json: String): ProfileStore {
+        val mapAdapter: JsonAdapter<Map<String, Any?>> = moshi.adapter()
+        val raw = mapAdapter.fromJson(json) ?: return ProfileStore()
 
-            val modernFakeLocation = FakeLocation(
-                oldJsonAdapterResult!!.x,
-                oldJsonAdapterResult.y,
-                0.0,
-                0,
-                0,
-                0,
-                0,
-                0,
-            )
-
-            jsonAdapterResult = modernFakeLocation
+        if (raw.containsKey("profiles")) {
+            val storeAdapter: JsonAdapter<ProfileStore> = moshi.adapter()
+            return storeAdapter.fromJson(json) ?: ProfileStore()
         }
 
-        return jsonAdapterResult
+        val legacyAdapter: JsonAdapter<LegacyFakeLocation> = moshi.adapter()
+        val legacy = legacyAdapter.fromJson(json) ?: return ProfileStore()
+
+        Log.i("Migrating a pre-profile config")
+        return ProfileStore.fromLegacy(legacy)
     }
 
     @ExperimentalStdlibApi
@@ -337,11 +371,10 @@ class ConfigGateway private constructor() {
     }
 
     @ExperimentalStdlibApi
-    fun writeFakeLocation(x: Double, y: Double, offset: Double, eci: Int, pci: Int, tac: Int, earfcn: Int, bandwidth: Int) {
-        val newFakeLocation = FakeLocation(x, y, offset, eci, pci, tac, earfcn, bandwidth)
-        val jsonAdapter: JsonAdapter<FakeLocation> = moshi.adapter()
+    fun writeProfileStore(store: ProfileStore) {
+        val jsonAdapter: JsonAdapter<ProfileStore> = moshi.adapter()
 
-        val json: String = jsonAdapter.toJson(newFakeLocation)
+        val json: String = jsonAdapter.toJson(store)
         universalAPICaller(json, 3)
     }
 

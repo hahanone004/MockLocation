@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_latitude" />
+
+    <EditText
+        android:id="@+id/field_latitude"
+        style="@style/FieldInput"
+        android:inputType="numberDecimal|numberSigned"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_longitude" />
+
+    <EditText
+        android:id="@+id/field_longitude"
+        style="@style/FieldInput"
+        android:inputType="numberDecimal|numberSigned"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_offset" />
+
+    <EditText
+        android:id="@+id/field_offset"
+        style="@style/FieldInput"
+        android:inputType="numberDecimal"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView
+        style="@style/FieldLabel"
+        android:text="@string/field_offset_hint" />
+</LinearLayout>

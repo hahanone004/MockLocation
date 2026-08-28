@@ -22,6 +22,7 @@ import com.idanatz.oneadapter.external.modules.EmptinessModule
 import com.scwang.smart.refresh.layout.api.RefreshLayout
 import kotlin.concurrent.thread
 
+import fuck.location.app.ui.config.ProfileEditors
 import fuck.location.app.ui.models.AppListModel
 import fuck.location.xposed.helpers.ConfigGateway
 import java.util.stream.Collectors
@@ -45,7 +46,7 @@ class ModuleActivity : AppCompatActivity() {
         binding = ActivitySelectAppsBinding.inflate(layoutInflater)
         recyclerView = binding.recycler
         oneAdapter = OneAdapter(recyclerView) {
-            itemModules += AppListModule(this@ModuleActivity)
+            itemModules += AppListModule(this@ModuleActivity) { this@ModuleActivity.refresh() }
             emptinessModule = EmptyListModule()
         }
 
@@ -103,6 +104,7 @@ class ModuleActivity : AppCompatActivity() {
 
     private fun updateInstalledPackages() {
         val storedList = ConfigGateway.get().readPackageList()
+        val store = ConfigGateway.get().readProfileStore()
         val checkCircle = AppCompatResources.getDrawable(this, R.drawable.baseline_check_circle_24)!!
         val displayNameComparator = ApplicationInfo.DisplayNameComparator(this.packageManager)
 
@@ -127,9 +129,14 @@ class ModuleActivity : AppCompatActivity() {
                 val icon = if (storedList?.contains(packageName) == true) checkCircle
                 else applicationInfo.loadIcon(packageManager)
 
+                // Only a deviation from the default is worth showing.
+                val assigned = store.assignments[packageName]
+                    ?.let { id -> store.profiles.firstOrNull { it.id == id } }
+
                 AppListModel(applicationInfo.loadLabel(packageManager).toString(),
                     packageName,
-                    icon)
+                    icon,
+                    assigned?.name.orEmpty())
             }.collect(Collectors.toList())
     }
 
@@ -148,7 +155,10 @@ class ModuleActivity : AppCompatActivity() {
         }
     }
 
-    class AppListModule(context: Context) : ItemModule<AppListModel>() {
+    class AppListModule(
+        private val context: Context,
+        private val onProfileAssigned: (String) -> Unit,
+    ) : ItemModule<AppListModel>() {
         init {
             val selectedAppsList: MutableList<String> = ConfigGateway.get().readPackageList() as MutableList<String>
 
@@ -158,8 +168,19 @@ class ModuleActivity : AppCompatActivity() {
             onBind { model, viewBinder, metadata ->
                 val title = viewBinder.findViewById<TextView>(R.id.app_list_module_title)
                 val icon = viewBinder.findViewById<ImageView>(R.id.app_list_module_icon)
+                val profile = viewBinder.findViewById<TextView>(R.id.app_list_module_profile)
+
                 title.text = model.title
                 icon.setImageDrawable(model.icon)
+
+                profile.text = model.profileLabel.ifEmpty {
+                    context.getString(R.string.profile_use_default)
+                }
+                profile.setOnClickListener {
+                    ProfileEditors.assignProfile(context, model.packageName) {
+                        onProfileAssigned(model.packageName)
+                    }
+                }
             }
             eventHooks += ClickEventHook<AppListModel>().apply {
                 onClick { model, viewBinder, metadata ->

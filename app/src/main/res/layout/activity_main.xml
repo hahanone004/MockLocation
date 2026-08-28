@@ -71,25 +71,6 @@
             android:orientation="vertical">
 
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/menu_detection_test"
-                style="@style/DefaultCard"
-                app:cardElevation="0dp">
-
-                <LinearLayout
-                    style="@style/Default"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        style="@style/DefaultImage"
-                        android:src="@drawable/baseline_my_location_24" />
-
-                    <TextView
-                        style="@style/DefaultText.Option.Card"
-                        android:text="@string/title_fucklocation_test" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
                 android:id="@+id/menu_location_credit"
                 style="@style/DefaultCard"
                 app:cardElevation="0dp">
@@ -104,12 +85,14 @@
 
                     <TextView
                         style="@style/DefaultText.Option.Card"
+                        android:layout_width="wrap_content"
+                        android:gravity="center_vertical"
                         android:text="@string/title_fucklocation_credit" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.card.MaterialCardView
-                android:id="@+id/menu_settings"
+                android:id="@+id/menu_profiles"
                 style="@style/DefaultCard"
                 app:cardElevation="0dp">
 
@@ -119,11 +102,97 @@
 
                     <ImageView
                         style="@style/DefaultImage"
-                        android:src="@drawable/baseline_settings_20" />
+                        android:src="@drawable/baseline_layers_24" />
 
                     <TextView
                         style="@style/DefaultText.Option.Card"
-                        android:text="@string/title_fucklocation_settings" />
+                        android:layout_width="wrap_content"
+                        android:gravity="center_vertical"
+                        android:text="@string/title_profiles" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/menu_location_spoof"
+                style="@style/DefaultCard"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    style="@style/Default"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        style="@style/DefaultImage"
+                        android:src="@drawable/baseline_my_location_24" />
+
+                    <TextView
+                        style="@style/DefaultText.Option.Card"
+                        android:layout_width="0dp" android:layout_weight="1"
+                        android:gravity="center_vertical"
+                        android:text="@string/title_location_spoof" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switch_location"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="16dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/menu_cell_spoof"
+                style="@style/DefaultCard"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    style="@style/Default"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        style="@style/DefaultImage"
+                        android:src="@drawable/baseline_cell_tower_24" />
+
+                    <TextView
+                        style="@style/DefaultText.Option.Card"
+                        android:layout_width="0dp" android:layout_weight="1"
+                        android:gravity="center_vertical"
+                        android:text="@string/title_cell_spoof" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switch_cell"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="16dp" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/menu_wifi_spoof"
+                style="@style/DefaultCard"
+                app:cardElevation="0dp">
+
+                <LinearLayout
+                    style="@style/Default"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        style="@style/DefaultImage"
+                        android:src="@drawable/baseline_wifi_24" />
+
+                    <TextView
+                        style="@style/DefaultText.Option.Card"
+                        android:layout_width="0dp" android:layout_weight="1"
+                        android:gravity="center_vertical"
+                        android:text="@string/title_wifi_spoof" />
+
+                    <com.google.android.material.switchmaterial.SwitchMaterial
+                        android:id="@+id/switch_wifi"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
+                        android:layout_marginEnd="16dp" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
@@ -142,6 +211,8 @@
 
                     <TextView
                         style="@style/DefaultText.Option.Card"
+                        android:layout_width="wrap_content"
+                        android:gravity="center_vertical"
                         android:text="@string/title_fucklocation_about" />
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>

@@ -2,12 +2,12 @@ package fuck.location.xposed.cellar.identity
 
 import android.telephony.CellIdentityNr
 import de.robv.android.xposed.XposedBridge
-import fuck.location.xposed.helpers.ConfigGateway
+import fuck.location.app.ui.models.Profile
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 
 class Nr {
     @OptIn(ExperimentalStdlibApi::class)
-    fun alterCellIdentity(cellIdentityNr: CellIdentityNr): CellIdentityNr {
+    fun alterCellIdentity(cellIdentityNr: CellIdentityNr, profile: Profile): CellIdentityNr {
         val constructor = HiddenApiBypass.getDeclaredConstructor(
             CellIdentityNr::class.java,
             Int::class.java,    // pci
@@ -22,17 +22,14 @@ class Nr {
             Collection::class.java, // additionalPlmns
         )
 
-        // One read: each call crosses a binder and re-parses the config file.
-        val fakeLocation = ConfigGateway.get().readFakeLocation()
-
         val customResult = constructor.newInstance(
-            fakeLocation.pci,
-            fakeLocation.tac,
-            fakeLocation.earfcn,
+            profile.pci,
+            profile.tac,
+            profile.earfcn,
             cellIdentityNr.bands,
             cellIdentityNr.mccString,
             cellIdentityNr.mncString,
-            fakeLocation.eci.toLong(),
+            profile.eci.toLong(),
             cellIdentityNr.operatorAlphaLong,
             cellIdentityNr.operatorAlphaShort,
             cellIdentityNr.additionalPlmns

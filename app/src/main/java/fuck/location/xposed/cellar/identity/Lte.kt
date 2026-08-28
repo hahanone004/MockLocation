@@ -3,12 +3,12 @@ package fuck.location.xposed.cellar.identity
 import android.telephony.CellIdentityLte
 import android.telephony.ClosedSubscriberGroupInfo
 import de.robv.android.xposed.XposedBridge
-import fuck.location.xposed.helpers.ConfigGateway
+import fuck.location.app.ui.models.Profile
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 
 class Lte {
     @ExperimentalStdlibApi
-    fun alterCellIdentity(cellIdentityLte: CellIdentityLte): CellIdentityLte {
+    fun alterCellIdentity(cellIdentityLte: CellIdentityLte, profile: Profile): CellIdentityLte {
         val constructor = HiddenApiBypass.getDeclaredConstructor(
             CellIdentityLte::class.java,
             Int::class.java,    // ci
@@ -25,18 +25,20 @@ class Lte {
             ClosedSubscriberGroupInfo::class.java,  // csgInfo
         )
 
-        // One read: each call crosses a binder and re-parses the config file.
-        val fakeLocation = ConfigGateway.get().readFakeLocation()
+        // A blank MCC or MNC means the profile does not care which network
+        // this claims to be on, so keep whatever the modem reported.
+        val mcc = profile.mcc.ifBlank { cellIdentityLte.mccString }
+        val mnc = profile.mnc.ifBlank { cellIdentityLte.mncString }
 
         val customResult = constructor.newInstance(
-            fakeLocation.eci,
-            fakeLocation.pci,
-            fakeLocation.tac,
-            fakeLocation.earfcn,
+            profile.eci,
+            profile.pci,
+            profile.tac,
+            profile.earfcn,
             cellIdentityLte.bands,
-            fakeLocation.bandwidth,
-            cellIdentityLte.mccString,
-            cellIdentityLte.mncString,
+            profile.bandwidth,
+            mcc,
+            mnc,
             cellIdentityLte.operatorAlphaLong,
             cellIdentityLte.operatorAlphaShort,
             cellIdentityLte.additionalPlmns,

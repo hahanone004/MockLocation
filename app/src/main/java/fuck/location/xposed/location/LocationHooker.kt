@@ -70,9 +70,9 @@ class LocationHooker {
                     val packageName = ConfigGateway.get().callerPackageName(it)
                     XposedBridge.log("FL: in getLastLocation! Caller package name: $packageName")
 
-                    if (ConfigGateway.get().inWhitelist(packageName)) {
+                    val profile = ConfigGateway.get().locationSpoofFor(packageName)
+                    if (profile != null) {
                         XposedBridge.log("FL: in whitelist! Return custom location")
-                        val fakeLocation = ConfigGateway.get().readFakeLocation()
 
                         lateinit var location: Location
                         lateinit var originLocation: Location
@@ -93,8 +93,9 @@ class LocationHooker {
                             location.verticalAccuracyMeters = originLocation.verticalAccuracyMeters
                         }
 
-                        location.latitude = fakeLocation.x + (Math.random() * fakeLocation.offset - fakeLocation.offset / 2)
-                        location.longitude = fakeLocation.y + (Math.random() * fakeLocation.offset - fakeLocation.offset / 2)
+                        val (latitude, longitude) = profile.jitteredPosition()
+                        location.latitude = latitude
+                        location.longitude = longitude
                         location.altitude = 0.0
                         location.isMock = false
                         location.speed = 0F
@@ -121,7 +122,7 @@ class LocationHooker {
 
                 XposedBridge.log("FL: in getCurrentLocation! Caller package name: $packageName")
 
-                if (ConfigGateway.get().inWhitelist(packageName)) {
+                if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
                     XposedBridge.log("FL: in whiteList! Inject null...")
                     param.result = null
                 }
@@ -134,7 +135,7 @@ class LocationHooker {
             val packageName = param.args[1] as String
             XposedBridge.log("FL: in registerGnssStatusCallback (S, DLC)! Caller package name: $packageName")
 
-            if (ConfigGateway.get().inWhitelist(packageName)) {
+            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
                 XposedBridge.log("FL: in whiteList! Dropping register request...")
                 param.result = null
                 return@hookBefore
@@ -147,7 +148,7 @@ class LocationHooker {
             val packageName = param.args[1] as String
             XposedBridge.log("FL: in registerGnssNmeaCallback (S, DLC)! Caller package name: $packageName")
 
-            if (ConfigGateway.get().inWhitelist(packageName)) {
+            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
                 XposedBridge.log("FL: in whiteList! Dropping register request...")
                 param.result = null
                 return@hookBefore
@@ -160,7 +161,7 @@ class LocationHooker {
             val packageName = param.args[2] as String
             XposedBridge.log("FL: in requestGeofence (S, DLC)! Caller package name: $packageName")
 
-            if (ConfigGateway.get().inWhitelist(packageName)) {
+            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
                 XposedBridge.log("FL: in whiteList! Dropping register request...")
                 param.result = null
                 return@hookBefore
@@ -208,7 +209,8 @@ class LocationHooker {
                 return@forEach
             }
 
-            if (!ConfigGateway.get().inWhitelist(packageName)) {
+            val profile = ConfigGateway.get().locationSpoofFor(packageName)
+            if (profile == null) {
                 passthrough[key] = value
                 return@forEach
             }
@@ -216,12 +218,12 @@ class LocationHooker {
             try {
                 val originLocation = realLocations.firstOrNull() as? Location
                     ?: Location(LocationManager.GPS_PROVIDER)
-                val fakeLocation = ConfigGateway.get().readFakeLocation()
 
                 val location = Location(originLocation.provider)
 
-                location.latitude = fakeLocation.x + (Math.random() * fakeLocation.offset - fakeLocation.offset / 2)
-                location.longitude = fakeLocation.y + (Math.random() * fakeLocation.offset - fakeLocation.offset / 2)
+                val (latitude, longitude) = profile.jitteredPosition()
+                location.latitude = latitude
+                location.longitude = longitude
                 location.isMock = false
                 location.altitude = 0.0
                 location.speed = 0F

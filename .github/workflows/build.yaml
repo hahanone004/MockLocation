@@ -21,17 +21,22 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee build.log
+
       - name: Build debug APK
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --stacktrace 2>&1 | tee build.log
+          ./gradlew assembleDebug --stacktrace 2>&1 | tee -a build.log
 
       # Downloading run logs needs admin rights on the repository, so put the
       # compiler output where anyone looking at the run can read it.
       - name: Surface build errors
         if: failure()
         run: |
-          details=$(grep -E "^e: |FAILURE:|What went wrong|Caused by:|error:|Could not (find|resolve)" build.log | head -40)
+          details=$(grep -E "^e: |FAILURE:|What went wrong|Caused by:|error:|Could not (find|resolve)|FAILED|expected:|tests? completed" build.log | head -40)
           details="${details//'%'/'%25'}"
           details="${details//$'\n'/'%0A'}"
           details="${details//$'\r'/'%0D'}"

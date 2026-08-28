@@ -4,136 +4,100 @@ import android.annotation.SuppressLint
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.text.Editable
 import android.view.View
-import android.widget.EditText
 import androidx.annotation.Keep
 import androidx.appcompat.content.res.AppCompatResources
-import com.afollestad.materialdialogs.LayoutMode
-import com.afollestad.materialdialogs.MaterialDialog
-import com.afollestad.materialdialogs.bottomsheets.BottomSheet
-import com.afollestad.materialdialogs.customview.customView
-import com.afollestad.materialdialogs.customview.getCustomView
+import com.google.android.material.switchmaterial.SwitchMaterial
 import fuck.location.R
+import fuck.location.app.ui.config.ProfileEditors
+import fuck.location.app.ui.models.Profile
 import fuck.location.databinding.ActivityMainBinding
-
 import fuck.location.xposed.helpers.ConfigGateway
-import java.text.NumberFormat
 
+@ExperimentalStdlibApi
 class MainActivity : AppCompatActivity(), View.OnClickListener {
     private lateinit var binding: ActivityMainBinding
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        ConfigGateway.get().setCustomContext(applicationContext)
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setModuleState(binding)
 
-        binding.menuDetectionTest.setOnClickListener(this)
         binding.menuLocationCredit.setOnClickListener(this)
-        binding.menuSettings.setOnClickListener(this)
+        binding.menuProfiles.setOnClickListener(this)
+        binding.menuLocationSpoof.setOnClickListener(this)
+        binding.menuCellSpoof.setOnClickListener(this)
+        binding.menuWifiSpoof.setOnClickListener(this)
         binding.menuAbout.setOnClickListener(this)
 
         setContentView(binding.root)
     }
 
+    override fun onResume() {
+        super.onResume()
+
+        // The profile editor and the whitelist screen both change what the
+        // switches should read, so refresh them rather than trusting onCreate.
+        bindSwitches()
+    }
+
     @SuppressLint("CheckResult")
-    @ExperimentalStdlibApi
     override fun onClick(v: View) {
         when (v.id) {
-            R.id.menu_detection_test -> {
-                MaterialDialog(this).show {
-                    title(text = getString(R.string.dialog_not_available_dialog))
-                    message(text = getString(R.string.dialog_not_available_content))
+            R.id.menu_location_credit -> startActivity(Intent(this, ModuleActivity::class.java))
+            R.id.menu_profiles -> ProfileEditors.manageProfiles(this) { bindSwitches() }
+            R.id.menu_about -> startActivity(Intent(this, AboutActivity::class.java))
+
+            // The three feature entries edit whichever profile is the default.
+            else -> {
+                val defaultProfileId = defaultProfileId() ?: return
+
+                when (v.id) {
+                    R.id.menu_location_spoof -> ProfileEditors.editLocation(this, defaultProfileId)
+                    R.id.menu_cell_spoof -> ProfileEditors.editCell(this, defaultProfileId)
+                    R.id.menu_wifi_spoof -> ProfileEditors.editWifi(this, defaultProfileId)
                 }
-            }
-
-            R.id.menu_location_credit -> {
-                val intent = Intent(this, ModuleActivity::class.java)
-                startActivity(intent)
-            }
-
-            R.id.menu_settings -> {
-                setFakeLocation()
-            }
-
-            R.id.menu_about -> {
-                val intent = Intent(this, AboutActivity::class.java)
-                startActivity(intent)
             }
         }
     }
 
-    @ExperimentalStdlibApi
-    private fun setFakeLocation() {
-        MaterialDialog(this, BottomSheet(LayoutMode.WRAP_CONTENT)).show {
-            title(R.string.custom_location_dialog)
-            customView(R.layout.custom_view_fakelocation, scrollable = true, horizontalPadding = true)
+    private fun defaultProfileId(): String? = ConfigGateway.get().readProfileStore().defaultProfile()?.id
 
-            ConfigGateway.get().setCustomContext(applicationContext)
-            val previousFakeLocation = ConfigGateway.get().readFakeLocation()
+    /**
+     * Points the three switches at the default profile. Setting the checked
+     * state fires the listener, so the listener is detached first; otherwise
+     * every refresh would write the config straight back.
+     */
+    private fun bindSwitches() {
+        val store = ConfigGateway.get().readProfileStore()
+        val profile = store.defaultProfile() ?: return
 
-            val previousYInput = previousFakeLocation?.y
-            val previousXInput = previousFakeLocation?.x
-            val previousOffsetInput = previousFakeLocation?.offset
-            val previousECIInput = previousFakeLocation?.eci
-            val previousPCIInput = previousFakeLocation?.pci
-            val previousTACInput = previousFakeLocation?.tac
-            val previousEarfCNInput = previousFakeLocation?.earfcn
-            val previousBandwidthInput = previousFakeLocation?.bandwidth
+        bindSwitch(binding.switchLocation, profile.locationEnabled) { it.copy(locationEnabled = this) }
+        bindSwitch(binding.switchCell, profile.cellEnabled) { it.copy(cellEnabled = this) }
+        bindSwitch(binding.switchWifi, profile.wifiEnabled) { it.copy(wifiEnabled = this) }
+    }
 
-            val numberFormat = NumberFormat.getNumberInstance()
-            numberFormat.isGroupingUsed = false
-            numberFormat.maximumFractionDigits = 20
-            findViewById<EditText>(R.id.custom_view_fl_x).setText(numberFormat.format(previousXInput))
-            findViewById<EditText>(R.id.custom_view_fl_y).setText(numberFormat.format(previousYInput))
-            findViewById<EditText>(R.id.custom_view_fl_offset).setText(numberFormat.format(previousOffsetInput))
+    private fun bindSwitch(
+        switch: SwitchMaterial,
+        checked: Boolean,
+        update: Boolean.(Profile) -> Profile,
+    ) {
+        switch.setOnCheckedChangeListener(null)
+        switch.isChecked = checked
+        switch.setOnCheckedChangeListener { _, isChecked ->
+            val store = ConfigGateway.get().readProfileStore()
+            val profile = store.defaultProfile() ?: return@setOnCheckedChangeListener
 
-            findViewById<EditText>(R.id.custom_view_fl_eci).setText(previousECIInput.toString())
-            findViewById<EditText>(R.id.custom_view_fl_pci).setText(previousPCIInput.toString())
-            findViewById<EditText>(R.id.custom_view_fl_tac).setText(previousTACInput.toString())
-            findViewById<EditText>(R.id.custom_view_fl_earfcn).setText(previousEarfCNInput.toString())
-            findViewById<EditText>(R.id.custom_view_fl_bandwidth).setText(previousBandwidthInput.toString())
-
-            positiveButton(R.string.custom_location_dialog_save) { dialog ->
-                val yInput: EditText = dialog.getCustomView()
-                    .findViewById(R.id.custom_view_fl_y)
-                val xInput: EditText = dialog.getCustomView()
-                    .findViewById(R.id.custom_view_fl_x)
-                val offsetInput: EditText = dialog.getCustomView()
-                    .findViewById(R.id.custom_view_fl_offset)
-                val eciInput: EditText = dialog.getCustomView()
-                    .findViewById(R.id.custom_view_fl_eci)
-                val pciInput: EditText = dialog.getCustomView()
-                    .findViewById(R.id.custom_view_fl_pci)
-                val tacInput: EditText = dialog.getCustomView()
-                    .findViewById(R.id.custom_view_fl_tac)
-                val earfcnInput: EditText = dialog.getCustomView()
-                    .findViewById(R.id.custom_view_fl_earfcn)
-                val bandwidthInput: EditText = dialog.getCustomView()
-                    .findViewById(R.id.custom_view_fl_bandwidth)
-
-                xInput.setText(xInput.text.takeIf { xInput.text.isNotEmpty() } ?: "0.0")
-                yInput.setText(yInput.text.takeIf { yInput.text.isNotEmpty() } ?: "0.0")
-                offsetInput.setText(offsetInput.text.takeIf { offsetInput.text.isNotEmpty() } ?: "0.0")
-                eciInput.setText(eciInput.text.takeIf { eciInput.text.isNotEmpty() } ?: "0")
-                pciInput.setText(pciInput.text.takeIf { pciInput.text.isNotEmpty() } ?: "0")
-                tacInput.setText(tacInput.text.takeIf { tacInput.text.isNotEmpty() } ?: "0")
-                earfcnInput.setText(earfcnInput.text.takeIf { earfcnInput.text.isNotEmpty() } ?: "0")
-                bandwidthInput.setText(bandwidthInput.text.takeIf { bandwidthInput.text.isNotEmpty() } ?: "0")
-
-                ConfigGateway.get().writeFakeLocation(
-                    xInput.text.toString().toDouble(),
-                    yInput.text.toString().toDouble(),
-                    offsetInput.text.toString().toDouble(),
-                    eciInput.text.toString().toInt(),
-                    pciInput.text.toString().toInt(),
-                    tacInput.text.toString().toInt(),
-                    earfcnInput.text.toString().toInt(),
-                    bandwidthInput.text.toString().toInt()
+            ConfigGateway.get().writeProfileStore(
+                store.copy(
+                    profiles = store.profiles.map {
+                        if (it.id == profile.id) isChecked.update(it) else it
+                    }
                 )
-            }
-            negativeButton(R.string.custom_location_dialog_notsave)
+            )
         }
     }
 
@@ -156,9 +120,11 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             binding.serviceStatusText.text = getText(R.string.card_detail_not_activated)
             binding.serveTimes.visibility = View.GONE
 
-            binding.menuDetectionTest.visibility = View.GONE
+            binding.menuProfiles.visibility = View.GONE
             binding.menuLocationCredit.visibility = View.GONE
-            binding.menuSettings.visibility = View.GONE
+            binding.menuLocationSpoof.visibility = View.GONE
+            binding.menuCellSpoof.visibility = View.GONE
+            binding.menuWifiSpoof.visibility = View.GONE
         }
     }
 
