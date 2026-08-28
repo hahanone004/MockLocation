@@ -54,8 +54,8 @@ dependencies {
     implementation 'com.drakeet.about:about:2.5.0'
 
     implementation 'com.github.idanatz:OneAdapter:2.1.6'
-    implementation 'io.github.scwang90:refresh-layout-kernel:2.1.1'
-    implementation 'io.github.scwang90:refresh-header-material:2.1.1'
+    implementation 'io.github.scwang90:refresh-layout-kernel:3.0.0-alpha'
+    implementation 'io.github.scwang90:refresh-header-material:3.0.0-alpha'
 
     implementation 'com.squareup.moshi:moshi:1.15.2'
     implementation 'com.squareup.moshi:moshi-kotlin:1.15.2'
