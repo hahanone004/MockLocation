@@ -302,9 +302,9 @@ class LocationHooker {
         val fields = mutableListOf<Field>()
         var current: Class<*>? = clazz
         while (current != null && current != Any::class.java) {
-            current.declaredFields.forEach {
-                runCatching { it.isAccessible = true }
-                    .onSuccess { fields.add(it) }
+            current.declaredFields.forEach { field ->
+                runCatching { field.isAccessible = true }
+                    .onSuccess { fields.add(field) }
             }
             current = current.superclass
         }
