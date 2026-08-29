@@ -6,7 +6,7 @@
     <string name="select_apps_activity_title">Select Apps</string>
 
     <string name="title_fucklocation_credit">Location whitelist</string>
-    <string name="title_fucklocation_about">About this module</string>
+    <string name="title_fucklocation_about">About this app</string>
 
     <string name="title_profiles">Profiles</string>
     <string name="title_location_spoof">Location</string>
@@ -98,7 +98,13 @@
 
     <string name="system_app">System apps</string>
 
-    <string name="about_slogan">About this module</string>
+    <string name="about_slogan">Fuck Location</string>
+    <string name="about_summary_title">About</string>
+    <string name="about_summary_content">This app provides configurable location, cellular, Wi-Fi, SIM identity, and language information to selected apps through the Xposed framework.</string>
+    <string name="about_usage_title">Getting started</string>
+    <string name="about_usage_content">Enable the module and include System Framework in its scope, then reboot the device. Create a profile, configure the required items, and assign it to an app. SIM identity and language changes also require the target app to be included in the module scope and restarted.</string>
+    <string name="about_notice_title">Notice</string>
+    <string name="about_notice_content">Use this app only on devices and applications you are authorized to test. Changes may not take effect until the related app is force stopped or the device is restarted. Compatibility can vary between Android versions, ROMs, and hook frameworks.</string>
     <string name="about_introduction_title">Tips and help</string>
     <string name="about_introduction_content">A module for returning specified location information to an application.\n\nThis application is designed to return the appropriate location information like a specific application (instead of using high precision positioning in the background at all times) to protect privacy while satisfying the usage scenario.</string>
 

@@ -5,7 +5,7 @@
     <string name="select_apps_activity_title">选择应用</string>
 
     <string name="title_fucklocation_credit">位置白名单</string>
-    <string name="title_fucklocation_about">关于本模块</string>
+    <string name="title_fucklocation_about">关于该应用</string>
 
     <string name="title_profiles">配置管理</string>
     <string name="title_location_spoof">位置伪装</string>
@@ -89,7 +89,13 @@
 
     <string name="system_app">系统应用</string>
 
-    <string name="about_slogan">关于该模块</string>
+    <string name="about_slogan">Fuck Location</string>
+    <string name="about_summary_title">应用介绍</string>
+    <string name="about_summary_content">本应用通过 Xposed 框架，为指定应用提供可配置的位置、基站、Wi-Fi、SIM 身份和系统语言信息。</string>
+    <string name="about_usage_title">使用说明</string>
+    <string name="about_usage_content">启用模块并将“系统框架”加入作用域，然后重启设备。新建配置，填写需要模拟的内容并分配给目标应用。SIM 身份和系统语言还需要将目标应用加入模块作用域，并重启目标应用进程。</string>
+    <string name="about_notice_title">注意事项</string>
+    <string name="about_notice_content">请仅在有权管理或测试的设备和应用中使用。部分修改需要强行停止目标应用或重启设备后才会生效。不同 Android 版本、系统和 Hook 框架的兼容情况可能有所差异。</string>
     <string name="about_introduction_title">关于和帮助</string>
     <string name="about_introduction_content">一个用于向应用返回指定位置信息的模块。\n\n这个应用旨在像特定的应用返回合适的位置信息（而不是随时都在后台使用高精度定位），在满足使用场景的情况下，保护隐私。</string>
 
