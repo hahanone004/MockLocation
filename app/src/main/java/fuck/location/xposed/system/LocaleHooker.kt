@@ -9,7 +9,6 @@ import fuck.location.xposed.helpers.ConfigGateway
 import fuck.location.xposed.helpers.reflect.Log
 import fuck.location.xposed.helpers.reflect.findAllMethods
 import fuck.location.xposed.helpers.reflect.findMethod
-import fuck.location.xposed.helpers.reflect.hookAfter
 import fuck.location.xposed.helpers.reflect.hookBefore
 import fuck.location.xposed.helpers.reflect.isStatic
 import java.util.Locale
@@ -81,8 +80,9 @@ class LocaleHooker {
          * which to make the binder call, so the old eager installation saw the
          * empty fallback and permanently missed the process' locale setup.
          * Application.attach is the first point with a guaranteed Context.
-         * Apply both halves there: the Java default and the Resources
-         * configuration which chooses the translations rendered by the app.
+         * Install before its original body: attach() invokes the app's
+         * attachBaseContext(), and apps such as TikTok read and cache the
+         * language there on their very first launch.
          */
         val attachMethods = findAllMethods(applicationClass, findSuper = true) {
             name == "attach" && parameterCount == 1 &&
@@ -91,10 +91,10 @@ class LocaleHooker {
         if (attachMethods.isEmpty()) {
             throw NoSuchMethodException("Application.attach(Context)")
         }
-        attachMethods.hookAfter { param ->
-            if (!installed.compareAndSet(false, true)) return@hookAfter
+        attachMethods.hookBefore { param ->
+            val context = param.args[0] as? Context ?: return@hookBefore
+            if (!installed.compareAndSet(false, true)) return@hookBefore
 
-            val context = param.args[0] as? Context ?: return@hookAfter
             ConfigGateway.get().setCustomContext(context)
             installLocale(packageName, context, localeListClass)
         }
