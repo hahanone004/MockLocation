@@ -54,26 +54,20 @@ class PhoneInterfaceManagerHooker {
         }.hookMethod {
             after { param ->
                 val packageName = param.args[0] as String
-                val profile = ConfigGateway.get().cellSpoofFor(packageName)
+                val profile = ConfigGateway.get().cellSpoofFor(packageName) ?: return@after
 
-                if (profile != null) {
-                    XposedBridge.log("FL: [Cellar] getCellLocation for $packageName")
+                param.result = when (val reported = param.result) {
+                    is CellIdentityNr -> Nr().alterCellIdentity(reported, profile)
 
-                    when (param.result) {
-                        is CellIdentityLte -> {
-                            XposedBridge.log("FL: [Cellar] Using LTE Network...")
-                            param.result = Lte().alterCellIdentity(param.result as CellIdentityLte, profile)
-                        }
-                        is CellIdentityNr -> {
-                            XposedBridge.log("FL: [Cellar] Using Nr Network...")
-                            param.result = Nr().alterCellIdentity(param.result as CellIdentityNr, profile)
-                        }
-                        else -> {
-                            XposedBridge.log("FL: [Cellar] Unsupported network type. Return null as fallback")
-                            param.result = null
-                        }
-                    }
+                    // Anything else - a GSM or WCDMA identity, or none at all -
+                    // is answered by building the profile's cell outright
+                    // rather than by reporting no cell while claiming to be
+                    // somewhere, which is the plainer tell of the two.
+                    is CellIdentityLte -> Lte().cellIdentity(profile, reported)
+                    else -> if (profile.describesCell) Lte().cellIdentity(profile) else null
                 }
+
+                XposedBridge.log("FL: [Cellar] getCellLocation for $packageName -> ${param.result}")
             }
         }
 
@@ -82,12 +76,17 @@ class PhoneInterfaceManagerHooker {
         }.hookMethod {
             before { param ->
                 val packageName = param.args[0] as String
+                val profile = ConfigGateway.get().cellSpoofFor(packageName) ?: return@before
 
-                if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
-                    XposedBridge.log("FL: [Cellar] getAllCellInfo for $packageName -> empty")
-                    val customAllCellInfo = ArrayList<CellInfo>()
-                    param.result = customAllCellInfo
-                }
+                // One cell, the configured one. An empty list used to be the
+                // answer, which says the phone can see no towers at all - not
+                // something that happens to a phone that is registered on a
+                // network and knows where it is.
+                val cells = ArrayList<CellInfo>()
+                if (profile.describesCell) cells.add(fuck.location.xposed.cellar.info.Lte().cellInfo(profile))
+
+                XposedBridge.log("FL: [Cellar] getAllCellInfo for $packageName -> ${cells.size} cell(s)")
+                param.result = cells
             }
         }
 

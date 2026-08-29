@@ -56,7 +56,7 @@ class TelephonyRegistryHooker {
                                                     name == "onCellLocationChanged"
                                                 }.invoke(
                                                     callBack,
-                                                    Lte().alterCellIdentity(originalCellIdentity, profile)
+                                                    Lte().cellIdentity(profile, originalCellIdentity)
                                                 )
                                             }
                                             is CellIdentityNr -> {
@@ -105,7 +105,7 @@ class TelephonyRegistryHooker {
                                                     is CellInfoLte -> {
                                                         modifiedCellInfoList.add(
                                                             fuck.location.xposed.cellar.info.Lte()
-                                                                .constructNewCellInfoLte(cellInfo, profile)
+                                                                .cellInfo(profile, cellInfo)
                                                         )
                                                     }
                                                     is CellInfoNr -> {

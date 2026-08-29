@@ -121,6 +121,14 @@ data class Profile(
     val sectorId: Int get() = eci and 0xFF
 
     /**
+     * Whether the profile actually describes a cell, as opposed to merely
+     * having the cell spoof switched on with nothing filled in. Reporting a
+     * fabricated cell of all zeros would be worse than reporting none.
+     */
+    val describesCell: Boolean
+        get() = mcc.isNotBlank() && mnc.isNotBlank() && eci != 0
+
+    /**
      * MCC and MNC glued together, which is what both getNetworkOperator and
      * getSimOperator return. Empty when either half is unset, so an unconfigured
      * profile reports nothing rather than a truncated operator.
