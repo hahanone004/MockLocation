@@ -2,6 +2,8 @@ package fuck.location.xposed
 
 import android.annotation.SuppressLint
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
@@ -17,7 +19,9 @@ import fuck.location.xposed.location.LocationHooker
 import fuck.location.xposed.location.WLANHooker
 import fuck.location.xposed.location.gnss.GnssHooker
 import fuck.location.xposed.system.LocaleHooker
+import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 
 @ExperimentalStdlibApi
 class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
@@ -48,9 +52,13 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 // fork, so arm it and come back.
                 Log.i("waiting for ActivityThread.systemMain")
 
-                findAllMethods(Class.forName("android.app.ActivityThread")) {
+                val systemMain = findAllMethods(Class.forName("android.app.ActivityThread")) {
                     name == "systemMain" && isStatic
-                }.hookAfter {
+                }
+                if (systemMain.isEmpty()) {
+                    throw NoSuchMethodException("ActivityThread.systemMain")
+                }
+                systemMain.hookAfter {
                     step("system_server (systemMain)") {
                         hookSystemServer(
                             systemServerClassLoader()
@@ -73,9 +81,13 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 XposedBridge.log("FL: Try to hook the module")
                 val clazz = lpparam.classLoader.loadClass("fuck.location.app.ui.activities.MainActivity")
 
-                findAllMethods(clazz) {
+                val activationMethods = findAllMethods(clazz, findSuper = true) {
                     name == "isModuleActivated" && isPublic
-                }.hookMethod {
+                }
+                if (activationMethods.isEmpty()) {
+                    throw NoSuchMethodException("isModuleActivated in ${clazz.name}")
+                }
+                activationMethods.hookMethod {
                     after { param ->
                         XposedBridge.log("FL: Unlock the module")
                         param.result = true
@@ -115,29 +127,70 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
      * guarded: whichever arrives first does the work.
      */
     private fun hookSystemServer(classLoader: ClassLoader) {
-        // A framework that both runs initZygote in system_server and dispatches
-        // handleLoadPackage for it would otherwise install everything twice,
-        // and a doubled onReportLocation hook would swap the registration map
-        // out from under its own copy. Compare-and-set rather than a plain flag
-        // because the two entry points need not share an instance, or a thread.
-        if (!systemServerHooked.compareAndSet(false, true)) return
+        synchronized(systemServerLock) {
+            if (systemServerHooked) return
 
-        Log.tag = "FuckLocation"
-        Log.i("hooking system_server, API ${Build.VERSION.SDK_INT}")
+            Log.tag = "FuckLocation"
+            Log.i("hooking system_server, API ${Build.VERSION.SDK_INT}")
 
-        // The zygote cannot list /data/system, so this is the first process
-        // that can actually find where the config lives.
-        step("config directory") { ConfigGateway.get().setDataPath() }
+            val complete = listOf(
+                installSystemStep("config directory") { ConfigGateway.get().requireDataPath() },
+                installSystemStep("config gateway (write)") {
+                    ConfigGateway.get().hookWillChangeBeEnabled(classLoader)
+                },
+                installSystemStep("config gateway (read)") {
+                    ConfigGateway.get().hookGetTagForIntentSender(classLoader)
+                },
+                installSystemStep("telephony registry") {
+                    TelephonyRegistryHooker().hookListen(classLoader)
+                },
+                installSystemStep("last location") {
+                    LocationHooker().hookLastLocation(classLoader)
+                },
+                installSystemStep("location DLC") {
+                    LocationHooker().hookDLC(classLoader)
+                },
+                installSystemStep("gnss") { GnssHooker().hookGnssCallbacks(classLoader) },
+                installSystemStep("wifi") { WLANHooker().hookWifiManager(classLoader) },
+            ).all { it }
 
-        step("config gateway (write)") { ConfigGateway.get().hookWillChangeBeEnabled(classLoader) }
-        step("config gateway (read)") { ConfigGateway.get().hookGetTagForIntentSender(classLoader) }
-        step("telephony registry") { TelephonyRegistryHooker().hookListen(classLoader) }
+            systemServerHooked = complete
+            if (!complete) {
+                Log.w("system_server hooks incomplete; scheduling a retry")
+                scheduleSystemServerRetry(classLoader)
+            }
+        }
+    }
 
-        step("last location") { LocationHooker().hookLastLocation(classLoader) }
-        step("location DLC") { LocationHooker().hookDLC(classLoader) }
-        step("gnss") { GnssHooker().hookGnssCallbacks(classLoader) }
+    private fun scheduleSystemServerRetry(classLoader: ClassLoader) {
+        if (systemServerRetryCount.get() >= MAX_SYSTEM_SERVER_RETRIES) {
+            Log.e("system_server hooks remain incomplete after $MAX_SYSTEM_SERVER_RETRIES retries")
+            return
+        }
+        if (!systemServerRetryScheduled.compareAndSet(false, true)) return
 
-        step("wifi") { WLANHooker().hookWifiManager(classLoader) }
+        try {
+            Handler(Looper.getMainLooper()).postDelayed({
+                systemServerRetryScheduled.set(false)
+                systemServerRetryCount.incrementAndGet()
+                hookSystemServer(classLoader)
+            }, SYSTEM_SERVER_RETRY_DELAY_MS)
+        } catch (t: Throwable) {
+            systemServerRetryScheduled.set(false)
+            Log.e("cannot schedule system_server hook retry", t)
+        }
+    }
+
+    private inline fun installSystemStep(name: String, action: () -> Unit): Boolean {
+        if (installedSystemSteps.contains(name)) return true
+        return try {
+            action()
+            installedSystemSteps.add(name)
+            true
+        } catch (t: Throwable) {
+            Log.e("hook step '$name' failed", t)
+            false
+        }
     }
 
     /**
@@ -174,6 +227,12 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
          */
         const val SYSTEM_SERVER_PROBE = "com.android.server.am.ActivityManagerService"
 
-        val systemServerHooked = AtomicBoolean(false)
+        val systemServerLock = Any()
+        val installedSystemSteps = ConcurrentHashMap.newKeySet<String>()
+        @Volatile var systemServerHooked = false
+        val systemServerRetryScheduled = AtomicBoolean(false)
+        val systemServerRetryCount = AtomicInteger(0)
+        const val MAX_SYSTEM_SERVER_RETRIES = 6
+        const val SYSTEM_SERVER_RETRY_DELAY_MS = 5_000L
     }
 }

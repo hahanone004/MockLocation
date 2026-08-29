@@ -41,25 +41,45 @@ class Lte {
 
         // A blank MCC or MNC means the profile does not care which network this
         // claims to be on, so keep whatever the modem reported.
-        val mcc = profile.mcc.ifBlank { reported?.mccString }
-        val mnc = profile.mnc.ifBlank { reported?.mncString }
+        val mcc = profile.mcc.takeIf { it.matches(Regex("^[0-9]{3}$")) }
+            ?: reported?.mccString
+        val mnc = profile.mnc.takeIf { it.matches(Regex("^[0-9]{2,3}$")) }
+            ?: reported?.mncString
         val operator = profile.simOperatorName.ifBlank {
             reported?.operatorAlphaLong?.toString()
         }
 
         return constructor.newInstance(
-            profile.eci,
-            profile.pci,
-            profile.tac,
-            profile.earfcn,
-            reported?.bands ?: IntArray(0),
-            profile.bandwidth,
+            profile.eci.coerceIn(0, 268_435_455),
+            profile.pci.coerceIn(0, 503),
+            profile.tac.coerceIn(0, 65_535),
+            profile.earfcn.coerceIn(0, 262_143),
+            // The EARFCN is simulated, so real modem bands cannot be retained:
+            // they may describe a completely different network.
+            bandsFor(profile.earfcn),
+            profile.bandwidth.takeIf {
+                it in setOf(0, 1_400, 3_000, 5_000, 10_000, 15_000, 20_000)
+            } ?: 0,
             mcc,
             mnc,
             operator,
             operator,
-            reported?.additionalPlmns ?: emptySet<String>(),
-            reported?.closedSubscriberGroupInfo,
+            // Both belong to the real cell/operator and can disclose it even
+            // after MCC, MNC and CI have been replaced.
+            emptySet<String>(),
+            null,
         ) as CellIdentityLte
+    }
+
+    private fun bandsFor(earfcn: Int): IntArray = try {
+        val utilities = Class.forName("android.telephony.AccessNetworkUtils")
+        val method = utilities.declaredMethods.firstOrNull {
+            it.name == "getOperatingBandForEarfcn" && it.parameterCount == 1
+        } ?: return IntArray(0)
+        method.isAccessible = true
+        val band = method.invoke(null, earfcn) as? Int ?: return IntArray(0)
+        if (band > 0) intArrayOf(band) else IntArray(0)
+    } catch (_: Throwable) {
+        IntArray(0)
     }
 }

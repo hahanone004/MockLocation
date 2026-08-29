@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="config_save_failed">Could not save: System Framework is not connected</string>
+    <string name="cell_config_invalid">Invalid cell configuration. Check MCC, MNC and LTE value ranges.</string>
     <string name="app_name">Fuck Location</string>
     <string name="select_apps_activity_title">Select Apps</string>
 
@@ -61,6 +63,8 @@
     <string name="switch_enable_wifi">Spoof Wi-Fi for this profile</string>
     <string name="switch_enable_sim">Spoof the SIM identity for this profile</string>
     <string name="switch_enable_locale">Report the system language as %s</string>
+    <string name="sim_config_invalid">Choose a carrier and enter a valid phone number and ICCID before enabling SIM spoofing.</string>
+    <string name="locale_restart_required">Force stop and restart the target app for the language change to take effect or be removed.</string>
     <string name="profile_feature_on">%s \u00b7 on</string>
     <string name="profile_feature_off">%s \u00b7 off</string>
 
@@ -80,6 +84,8 @@
     <string name="play_services_title">Apps that ask Play Services</string>
     <string name="play_services_message">Most apps never ask the system where they are - they ask Google Play Services, and all the system ever sees is Play Services asking. An app like that sees nothing new until Play Services is on the same profile.\n\nThat covers every app which gets its location that way, not only this one.</string>
     <string name="play_services_assign">Assign Play Services too</string>
+    <string name="target_scope_title">Target app scope required</string>
+    <string name="target_scope_message">SIM properties and system language are hooked inside %s. Add this app to Vector/LSPosed scope and restart its process; System Framework scope alone only covers system-side location, cell and Wi-Fi hooks.</string>
     <string name="profile_does_nothing">%s \u00b7 spoofs nothing</string>
 
     <string name="card_title_not_activated">Not activated</string>

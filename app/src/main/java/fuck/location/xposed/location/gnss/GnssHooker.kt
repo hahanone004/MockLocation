@@ -1,11 +1,13 @@
 package fuck.location.xposed.location.gnss
 
 import android.annotation.SuppressLint
+import fuck.location.xposed.helpers.ConfigGateway
 import fuck.location.xposed.helpers.reflect.findAllMethods
 import fuck.location.xposed.helpers.reflect.hookBefore
 import fuck.location.xposed.helpers.reflect.isPublic
 import de.robv.android.xposed.XposedBridge
-import fuck.location.xposed.helpers.ConfigGateway
+import java.lang.reflect.Method
+import java.util.concurrent.ConcurrentHashMap
 
 class GnssHooker {
     @OptIn(ExperimentalStdlibApi::class)
@@ -14,64 +16,58 @@ class GnssHooker {
         val clazz =
             classLoader.loadClass("com.android.server.location.gnss.GnssManagerService")
 
-        findAllMethods(clazz) {
-            name == "registerGnssStatusCallback" && isPublic
-        }.hookBefore { param ->
-            val packageName = param.args[1] as String
-
-            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
-                XposedBridge.log("FL: dropping a GNSS registration from $packageName")
-                param.result = null
-                return@hookBefore
+        val registrations = listOf(
+            "registerGnssStatusCallback",
+            "registerGnssNmeaCallback",
+            "addGnssMeasurementsListener",
+            "addGnssNavigationMessageListener",
+            "addGnssAntennaInfoListener",
+        )
+        val resolved = registrations.associateWith { methodName ->
+            findAllMethods(clazz, findSuper = true) {
+                name == methodName && isPublic
+            }
+        }
+        resolved.forEach { (methodName, methods) ->
+            if (methods.isEmpty()) {
+                XposedBridge.log("FL: GNSS method unavailable: $methodName in ${clazz.name}")
             }
         }
 
-        findAllMethods(clazz) {
-            name == "registerGnssNmeaCallback" && isPublic
-        }.hookBefore { param ->
-            val packageName = param.args[1] as String
-
-            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
-                XposedBridge.log("FL: dropping a GNSS registration from $packageName")
-                param.result = null
-                return@hookBefore
-            }
+        val missingCore = setOf(
+            "registerGnssStatusCallback",
+            "registerGnssNmeaCallback",
+        ).filter { resolved[it].isNullOrEmpty() }
+        if (missingCore.isNotEmpty()) {
+            throw NoSuchMethodException("missing core GNSS methods $missingCore in ${clazz.name}")
         }
 
-        findAllMethods(clazz) {
-            name == "addGnssMeasurementsListener" && isPublic
-        }.hookBefore { param ->
-            val packageName = param.args[2] as String
-
-            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
-                XposedBridge.log("FL: dropping a GNSS registration from $packageName")
-                param.result = null
-                return@hookBefore
+        var failure: Throwable? = null
+        resolved.values.flatten().filter { hookedMethods.add(it) }.forEach { method ->
+            try {
+                method.hookBefore { param -> disableForSpoofedApp(param) }
+            } catch (t: Throwable) {
+                hookedMethods.remove(method)
+                failure = t
             }
         }
+        failure?.let { throw it }
+    }
 
-        findAllMethods(clazz) {
-            name == "addGnssNavigationMessageListener" && isPublic
-        }.hookBefore { param ->
-            val packageName = param.args[1] as String
+    @OptIn(ExperimentalStdlibApi::class)
+    private fun disableForSpoofedApp(param: de.robv.android.xposed.XC_MethodHook.MethodHookParam) {
+        // Signatures and package-name indices differ between Android releases.
+        // Pick the string argument that actually resolves to a spoofed app.
+        val packageName = param.args.filterIsInstance<String>().firstOrNull {
+            ConfigGateway.get().locationSpoofFor(it) != null
+        } ?: return
 
-            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
-                XposedBridge.log("FL: dropping a GNSS registration from $packageName")
-                param.result = null
-                return@hookBefore
-            }
-        }
+        XposedBridge.log("FL: disabling ${param.method.name} for $packageName")
+        val returnType = (param.method as Method).returnType
+        param.result = if (returnType == Boolean::class.javaPrimitiveType) false else null
+    }
 
-        findAllMethods(clazz) {
-            name == "addGnssAntennaInfoListener" && isPublic
-        }.hookBefore { param ->
-            val packageName = param.args[1] as String
-
-            if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
-                XposedBridge.log("FL: dropping a GNSS registration from $packageName")
-                param.result = null
-                return@hookBefore
-            }
-        }
+    private companion object {
+        val hookedMethods = ConcurrentHashMap.newKeySet<Method>()
     }
 }

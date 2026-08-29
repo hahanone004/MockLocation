@@ -1,6 +1,7 @@
 package fuck.location.app.ui.models
 
 import java.security.MessageDigest
+import java.util.Random
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -27,8 +28,8 @@ data class Profile(
      *
      * Off by default: an app with no assignment of its own follows the default
      * profile, so a freshly installed module that shipped these on would spoof
-     * every app on the device with a position of 0, 0. Profiles the user
-     * creates deliberately are switched on at creation instead.
+     * every app on the device with a position of 0, 0. Newly named profiles
+     * also stay off until their individual editors contain valid values.
      */
     val locationEnabled: Boolean = false,
     val cellEnabled: Boolean = false,
@@ -88,22 +89,46 @@ data class Profile(
      * divided by cos(latitude); without that a "50 m" jitter in Helsinki would
      * only move you about 25 m east.
      */
-    fun jitteredPosition(): Pair<Double, Double> {
-        if (offset <= 0.0) return x to y
+    fun jitteredPosition(
+        nowMillis: Long = System.nanoTime() / 1_000_000L,
+    ): Pair<Double, Double> {
+        val baseLatitude = x.takeIf { it.isFinite() }?.coerceIn(-90.0, 90.0) ?: 0.0
+        val baseLongitude = normalizeLongitude(y.takeIf { it.isFinite() } ?: 0.0)
+        val safeOffset = offset.takeIf { it.isFinite() && it > 0.0 } ?: 0.0
+        if (safeOffset == 0.0) return baseLatitude to baseLongitude
 
-        // sqrt keeps the draw uniform over the disc rather than clustered
-        // around the centre.
-        val angle = Math.random() * 2 * PI
-        val radius = offset * sqrt(Math.random())
+        // nanoTime is backed by Android's monotonic clock and shares the same
+        // boot-relative timeline across the app and system_server processes.
+        val bucket = nowMillis / JITTER_WINDOW_MS
+        val fraction = (nowMillis % JITTER_WINDOW_MS).toDouble() / JITTER_WINDOW_MS
+        val smooth = fraction * fraction * (3.0 - 2.0 * fraction)
+        val from = jitterAnchor(baseLatitude, baseLongitude, safeOffset, bucket)
+        val to = jitterAnchor(baseLatitude, baseLongitude, safeOffset, bucket + 1)
+        val latitude = from.first + (to.first - from.first) * smooth
+        val longitudeDelta = normalizeLongitude(to.second - from.second)
+        return latitude.coerceIn(-90.0, 90.0) to
+            normalizeLongitude(from.second + longitudeDelta * smooth)
+    }
 
-        val latitude = x + (radius * cos(angle)) / METRES_PER_DEGREE
-
-        // Guard the poles, where a metre of easting spans arbitrarily many
-        // degrees and the division blows up.
-        val shrink = cos(x * PI / 180)
-        val longitude = if (abs(shrink) < 1e-6) y
-        else y + (radius * sin(angle)) / (METRES_PER_DEGREE * shrink)
-
+    private fun jitterAnchor(
+        baseLatitude: Double,
+        baseLongitude: Double,
+        safeOffset: Double,
+        bucket: Long,
+    ): Pair<Double, Double> {
+        val seed = stableDigest().fold(bucket) { value, byte ->
+            value * 31L + (byte.toInt() and 0xff)
+        }
+        val random = Random(seed)
+        // sqrt keeps each anchor uniform over the configured disc.
+        val angle = random.nextDouble() * 2 * PI
+        val radius = safeOffset * sqrt(random.nextDouble())
+        val latitude = (baseLatitude + radius * cos(angle) / METRES_PER_DEGREE)
+            .coerceIn(-90.0, 90.0)
+        val shrink = cos(baseLatitude * PI / 180)
+        val longitude = if (abs(shrink) < 1e-6) baseLongitude else normalizeLongitude(
+            baseLongitude + radius * sin(angle) / (METRES_PER_DEGREE * shrink)
+        )
         return latitude to longitude
     }
 
@@ -127,7 +152,10 @@ data class Profile(
      * fabricated cell of all zeros would be worse than reporting none.
      */
     val describesCell: Boolean
-        get() = mcc.isNotBlank() && mnc.isNotBlank() && eci != 0
+        get() = mcc.trim().matches(Regex("^[0-9]{3}$")) &&
+            mnc.trim().matches(Regex("^[0-9]{2,3}$")) &&
+            eci in 1..268_435_455 && tac in 0..65_535 && pci in 0..503 &&
+            earfcn in 0..262_143
 
     /**
      * MCC and MNC glued together, which is what both getNetworkOperator and
@@ -161,6 +189,7 @@ data class Profile(
 
         /** Metres per degree of latitude, near enough anywhere on the globe. */
         const val METRES_PER_DEGREE = 111_320.0
+        private const val JITTER_WINDOW_MS = 30_000L
 
         fun eciOf(eNodeBId: Int, sectorId: Int): Int =
             ((eNodeBId and 0xFFFFF) shl 8) or (sectorId and 0xFF)
@@ -173,13 +202,16 @@ data class Profile(
 
             return (10 - sum % 10) % 10
         }
+
+        private fun normalizeLongitude(value: Double): Double =
+            ((value + 180.0) % 360.0 + 360.0) % 360.0 - 180.0
     }
 }
 
 /** One access point to report to apps using the owning profile. */
 data class FakeAccessPoint(
     val ssid: String = "",
-    val bssid: String = "",
+    val bssid: String = "02:00:00:00:00:01",
     /** Signal strength in dBm; -50 is a strong nearby AP. */
     val level: Int = -50,
     /** Centre frequency in MHz; 2437 is 2.4 GHz channel 6. */

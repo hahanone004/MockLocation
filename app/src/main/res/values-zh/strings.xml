@@ -1,4 +1,6 @@
 <resources>
+    <string name="config_save_failed">保存失败：未连接到系统框架</string>
+    <string name="cell_config_invalid">基站配置无效，请检查 MCC、MNC 和 LTE 参数范围</string>
     <string name="app_name">Fuck Location</string>
     <string name="select_apps_activity_title">选择应用</string>
 
@@ -52,6 +54,8 @@
     <string name="switch_enable_wifi">本配置伪装 WiFi</string>
     <string name="switch_enable_sim">本配置伪装 SIM 卡信息</string>
     <string name="switch_enable_locale">同时把系统语言报成 %s</string>
+    <string name="sim_config_invalid">启用 SIM 伪装前，请选择运营商并填写有效的手机号和 ICCID。</string>
+    <string name="locale_restart_required">语言设置的启用、修改或关闭需要强行停止并重新启动目标应用后才能完整生效。</string>
     <string name="profile_feature_on">%s \u00b7 已开启</string>
     <string name="profile_feature_off">%s \u00b7 已关闭</string>
 
@@ -71,6 +75,8 @@
     <string name="play_services_title">走 Play 服务定位的应用</string>
     <string name="play_services_message">多数应用不会自己向系统要位置，而是问 Google Play 服务，系统看到的调用方永远是 Play 服务。这类应用只指派它自己是不会有任何变化的，得把 Play 服务也放到同一个配置里。\n\n注意这对所有走这条路取位置的应用都生效，不只是刚才那一个。</string>
     <string name="play_services_assign">把 Play 服务也指派过去</string>
+    <string name="target_scope_title">还需要勾选目标应用作用域</string>
+    <string name="target_scope_message">SIM 属性和系统语言是在 %s 自身进程内 Hook 的。请把该应用加入 Vector/LSPosed 作用域并重启其进程；只勾选“系统框架”仅能覆盖系统侧的定位、基站和 Wi-Fi Hook。</string>
     <string name="profile_does_nothing">%s \u00b7 未开启伪装</string>
 
     <string name="card_title_not_activated">模块未激活</string>

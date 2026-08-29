@@ -44,9 +44,13 @@ class LocaleHooker {
         val applicationClass = lpparam.classLoader.loadClass("android.app.Application")
         val installed = AtomicBoolean(false)
 
-        findAllMethods(localeListClass) {
+        val defaultMethods = findAllMethods(localeListClass, findSuper = true) {
             name == "setDefault" && isStatic
-        }.hookBefore { param ->
+        }
+        if (defaultMethods.isEmpty()) {
+            throw NoSuchMethodException("LocaleList.setDefault")
+        }
+        defaultMethods.hookBefore { param ->
             val spoofed = localeListFor(packageName) ?: return@hookBefore
 
             param.args[0] = spoofed
@@ -55,9 +59,13 @@ class LocaleHooker {
             if (param.args.size > 1) param.args[1] = 0
         }
 
-        findAllMethods(resourcesClass) {
+        val updateMethods = findAllMethods(resourcesClass, findSuper = true) {
             name == "updateConfiguration"
-        }.hookBefore { param ->
+        }
+        if (updateMethods.isEmpty()) {
+            throw NoSuchMethodException("Resources.updateConfiguration")
+        }
+        updateMethods.hookBefore { param ->
             val spoofed = localeListFor(packageName) ?: return@hookBefore
             val original = param.args.getOrNull(0) as? Configuration ?: return@hookBefore
 
@@ -76,10 +84,14 @@ class LocaleHooker {
          * Apply both halves there: the Java default and the Resources
          * configuration which chooses the translations rendered by the app.
          */
-        findAllMethods(applicationClass) {
+        val attachMethods = findAllMethods(applicationClass, findSuper = true) {
             name == "attach" && parameterCount == 1 &&
                 parameterTypes[0] == Context::class.java
-        }.hookAfter { param ->
+        }
+        if (attachMethods.isEmpty()) {
+            throw NoSuchMethodException("Application.attach(Context)")
+        }
+        attachMethods.hookAfter { param ->
             if (!installed.compareAndSet(false, true)) return@hookAfter
 
             val context = param.args[0] as? Context ?: return@hookAfter

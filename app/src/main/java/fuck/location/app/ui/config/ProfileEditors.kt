@@ -8,6 +8,7 @@ import android.view.View
 import android.view.WindowManager
 import android.widget.EditText
 import android.widget.TextView
+import android.widget.Toast
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
@@ -36,6 +37,7 @@ import java.util.UUID
 object ProfileEditors {
 
     private const val PLAY_SERVICES = "com.google.android.gms"
+    private val LTE_BANDWIDTHS = setOf(0, 1_400, 3_000, 5_000, 10_000, 15_000, 20_000)
 
     /** Enough decimals that a coordinate survives a round trip through the UI. */
     private val plainNumber: NumberFormat = NumberFormat.getNumberInstance().apply {
@@ -50,6 +52,7 @@ object ProfileEditors {
         val profile = store.profiles.firstOrNull { it.id == profileId } ?: return
 
         MaterialDialog(context).show {
+            noAutoDismiss()
             title(text = context.getString(R.string.dialog_location_title, profile.displayName(context)))
             customView(R.layout.dialog_location, scrollable = true, horizontalPadding = true)
 
@@ -64,21 +67,28 @@ object ProfileEditors {
 
             positiveButton(R.string.action_save) { dialog ->
                 val fields = dialog.getCustomView()
+                val current = ConfigGateway.get().readProfileStore()
+                val latest = current.profiles.firstOrNull { it.id == profileId }
+                    ?: return@positiveButton
 
-                ConfigGateway.get().writeProfileStore(
-                    store.replacing(
-                        profile.copy(
+                save(context,
+                    current.replacing(
+                        latest.copy(
                             locationEnabled = fields.switched(R.id.switch_location_enabled),
-                            x = fields.decimal(R.id.field_latitude, profile.x),
-                            y = fields.decimal(R.id.field_longitude, profile.y),
-                            offset = fields.decimal(R.id.field_offset, profile.offset)
-                                .coerceAtLeast(0.0),
+                            x = fields.decimal(R.id.field_latitude, latest.x)
+                                .takeIf { it.isFinite() }?.coerceIn(-90.0, 90.0) ?: 0.0,
+                            y = fields.decimal(R.id.field_longitude, latest.y)
+                                .takeIf { it.isFinite() }?.coerceIn(-180.0, 180.0) ?: 0.0,
+                            offset = fields.decimal(R.id.field_offset, latest.offset)
+                                .takeIf { it.isFinite() && it >= 0.0 } ?: 0.0,
                         )
                     )
-                )
-                onSaved()
+                ) {
+                    onSaved()
+                    dialog.dismiss()
+                }
             }
-            negativeButton(R.string.action_discard)
+            negativeButton(R.string.action_discard) { it.dismiss() }
         }
     }
 
@@ -87,13 +97,21 @@ object ProfileEditors {
         val profile = store.profiles.firstOrNull { it.id == profileId } ?: return
 
         MaterialDialog(context).show {
+            noAutoDismiss()
             title(text = context.getString(R.string.dialog_cell_title, profile.displayName(context)))
             customView(R.layout.dialog_cell, scrollable = true, horizontalPadding = true)
 
             val view = getCustomView()
+            val carrierIdentity = CarrierCatalog.carrierOf(profile.simCarrierId)
             view.findViewById<SwitchMaterial>(R.id.switch_cell_enabled).isChecked = profile.cellEnabled
-            view.findViewById<EditText>(R.id.field_mcc).setText(profile.mcc)
-            view.findViewById<EditText>(R.id.field_mnc).setText(profile.mnc)
+            view.findViewById<EditText>(R.id.field_mcc).apply {
+                setText(carrierIdentity?.first?.mcc ?: profile.mcc)
+                isEnabled = carrierIdentity == null
+            }
+            view.findViewById<EditText>(R.id.field_mnc).apply {
+                setText(carrierIdentity?.second?.mnc ?: profile.mnc)
+                isEnabled = carrierIdentity == null
+            }
             view.findViewById<EditText>(R.id.field_tac).setText(profile.tac.toString())
             view.findViewById<EditText>(R.id.field_eci).setText(profile.eci.toString())
             view.findViewById<EditText>(R.id.field_enodeb).setText(profile.eNodeBId.toString())
@@ -110,24 +128,49 @@ object ProfileEditors {
 
             positiveButton(R.string.action_save) { dialog ->
                 val fields = dialog.getCustomView()
+                val mcc = fields.text(R.id.field_mcc)
+                val mnc = fields.text(R.id.field_mnc)
+                val tac = fields.text(R.id.field_tac).toIntOrNull()
+                val eci = fields.text(R.id.field_eci).toIntOrNull()
+                val pci = fields.text(R.id.field_pci).toIntOrNull()
+                val earfcn = fields.text(R.id.field_earfcn).toIntOrNull()
+                val bandwidth = fields.text(R.id.field_bandwidth).toIntOrNull()
+                val cellEnabled = fields.switched(R.id.switch_cell_enabled)
+                val valid = !cellEnabled || mcc.matches(Regex("^[0-9]{3}$")) &&
+                    mnc.matches(Regex("^[0-9]{2,3}$")) &&
+                    tac != null && tac in 0..65_535 &&
+                    eci != null && eci in 0..268_435_455 &&
+                    pci != null && pci in 0..503 &&
+                    earfcn != null && earfcn in 0..262_143 &&
+                    bandwidth != null && bandwidth in LTE_BANDWIDTHS
+                if (!valid) {
+                    Toast.makeText(context, R.string.cell_config_invalid, Toast.LENGTH_LONG).show()
+                    return@positiveButton
+                }
+                val current = ConfigGateway.get().readProfileStore()
+                val latest = current.profiles.firstOrNull { it.id == profileId }
+                    ?: return@positiveButton
+                val latestCarrier = CarrierCatalog.carrierOf(latest.simCarrierId)
 
-                ConfigGateway.get().writeProfileStore(
-                    store.replacing(
-                        profile.copy(
-                            cellEnabled = fields.switched(R.id.switch_cell_enabled),
-                            mcc = fields.text(R.id.field_mcc),
-                            mnc = fields.text(R.id.field_mnc),
-                            tac = fields.integer(R.id.field_tac, profile.tac),
-                            eci = fields.integer(R.id.field_eci, profile.eci),
-                            pci = fields.integer(R.id.field_pci, profile.pci),
-                            earfcn = fields.integer(R.id.field_earfcn, profile.earfcn),
-                            bandwidth = fields.integer(R.id.field_bandwidth, profile.bandwidth),
+                save(context,
+                    current.replacing(
+                        latest.copy(
+                            cellEnabled = cellEnabled,
+                            mcc = latestCarrier?.first?.mcc ?: mcc,
+                            mnc = latestCarrier?.second?.mnc ?: mnc,
+                            tac = tac ?: latest.tac,
+                            eci = eci ?: latest.eci,
+                            pci = pci ?: latest.pci,
+                            earfcn = earfcn ?: latest.earfcn,
+                            bandwidth = bandwidth ?: latest.bandwidth,
                         )
                     )
-                )
-                onSaved()
+                ) {
+                    onSaved()
+                    dialog.dismiss()
+                }
             }
-            negativeButton(R.string.action_discard)
+            negativeButton(R.string.action_discard) { it.dismiss() }
         }
     }
 
@@ -136,6 +179,7 @@ object ProfileEditors {
         val profile = store.profiles.firstOrNull { it.id == profileId } ?: return
 
         MaterialDialog(context).show {
+            noAutoDismiss()
             title(text = context.getString(R.string.dialog_wifi_title, profile.displayName(context)))
             customView(R.layout.dialog_wifi, scrollable = true, horizontalPadding = true)
 
@@ -148,18 +192,23 @@ object ProfileEditors {
 
             positiveButton(R.string.action_save) { dialog ->
                 val fields = dialog.getCustomView()
+                val current = ConfigGateway.get().readProfileStore()
+                val latest = current.profiles.firstOrNull { it.id == profileId }
+                    ?: return@positiveButton
 
-                ConfigGateway.get().writeProfileStore(
-                    store.replacing(
-                        profile.copy(
+                save(context,
+                    current.replacing(
+                        latest.copy(
                             wifiEnabled = fields.switched(R.id.switch_wifi_enabled),
                             wifiAccessPoints = WifiListFormat.parse(fields.text(R.id.field_wifi_list)),
                         )
                     )
-                )
-                onSaved()
+                ) {
+                    onSaved()
+                    dialog.dismiss()
+                }
             }
-            negativeButton(R.string.action_discard)
+            negativeButton(R.string.action_discard) { it.dismiss() }
         }
     }
 
@@ -181,6 +230,7 @@ object ProfileEditors {
         var carrier = stored?.second
 
         MaterialDialog(context).show {
+            noAutoDismiss()
             title(text = context.getString(R.string.dialog_sim_title, profile.displayName(context)))
             customView(R.layout.dialog_sim, scrollable = true, horizontalPadding = true)
 
@@ -267,29 +317,58 @@ object ProfileEditors {
             positiveButton(R.string.action_save) { dialog ->
                 val fields = dialog.getCustomView()
                 val picked = carrier
+                val simEnabled = fields.switched(R.id.switch_sim_enabled)
+                val localeEnabled = fields.switched(R.id.switch_locale_enabled)
+                val phoneNumber = fields.text(R.id.field_phone_number)
+                val simSerial = fields.text(R.id.field_sim_serial)
+                val valid = (!localeEnabled || simEnabled) && (!simEnabled ||
+                    picked != null &&
+                    phoneNumber.all { it.isDigit() } &&
+                    phoneNumber.length == country.numberLength &&
+                    simSerial.all { it.isDigit() } &&
+                    simSerial.length in 19..20 &&
+                    CarrierCatalog.luhnValid(simSerial) &&
+                    (!localeEnabled || country.locale.isNotBlank()))
+                if (!valid) {
+                    Toast.makeText(context, R.string.sim_config_invalid, Toast.LENGTH_LONG).show()
+                    return@positiveButton
+                }
+                val current = ConfigGateway.get().readProfileStore()
+                val latest = current.profiles.firstOrNull { it.id == profileId }
+                    ?: return@positiveButton
 
-                ConfigGateway.get().writeProfileStore(
-                    store.replacing(
-                        profile.copy(
-                            simEnabled = fields.switched(R.id.switch_sim_enabled),
+                save(context,
+                    current.replacing(
+                        latest.copy(
+                            simEnabled = simEnabled,
                             simCarrierId = picked?.id ?: "",
                             simCountryIso = if (picked != null) country.iso else "",
                             simOperatorName = picked?.operatorName ?: "",
-                            phoneNumber = fields.text(R.id.field_phone_number),
-                            simSerial = fields.text(R.id.field_sim_serial),
-                            localeEnabled = fields.switched(R.id.switch_locale_enabled),
+                            phoneNumber = phoneNumber,
+                            simSerial = simSerial,
+                            localeEnabled = localeEnabled,
                             localeTag = country.locale,
                             // The cell identity describes the same network, so
                             // the carrier decides its MCC and MNC too rather
                             // than letting the two drift apart.
-                            mcc = if (picked != null) country.mcc else profile.mcc,
-                            mnc = picked?.mnc ?: profile.mnc,
+                            mcc = if (picked != null) country.mcc else latest.mcc,
+                            mnc = picked?.mnc ?: latest.mnc,
                         )
                     )
-                )
-                onSaved()
+                ) {
+                    onSaved()
+                    if (profile.localeEnabled != localeEnabled ||
+                        profile.localeTag != country.locale) {
+                        Toast.makeText(
+                            context,
+                            R.string.locale_restart_required,
+                            Toast.LENGTH_LONG,
+                        ).show()
+                    }
+                    dialog.dismiss()
+                }
             }
-            negativeButton(R.string.action_discard)
+            negativeButton(R.string.action_discard) { it.dismiss() }
         }
     }
 
@@ -322,8 +401,9 @@ object ProfileEditors {
 
     private fun createProfile(context: Context, onChanged: () -> Unit) {
         MaterialDialog(context).show {
+            noAutoDismiss()
             title(R.string.profile_action_new)
-            input(hintRes = R.string.profile_name_hint) { _, text ->
+            input(hintRes = R.string.profile_name_hint) { dialog, text ->
                 val name = text.toString().trim()
                 if (name.isEmpty()) return@input
 
@@ -331,19 +411,24 @@ object ProfileEditors {
                 val created = Profile(
                     id = UUID.randomUUID().toString(),
                     name = name,
-                    locationEnabled = true,
-                    cellEnabled = true,
-                    wifiEnabled = true,
-                    simEnabled = true,
+                    // A name alone is not a valid environment. Let the user
+                    // configure each feature before explicitly enabling it.
+                    locationEnabled = false,
+                    cellEnabled = false,
+                    wifiEnabled = false,
+                    simEnabled = false,
                 )
 
-                ConfigGateway.get().writeProfileStore(
-                    store.copy(profiles = store.profiles + created)
-                )
-                onChanged()
-                profileActions(context, created.id, onChanged)
+                val current = ConfigGateway.get().readProfileStore()
+                save(context,
+                    current.copy(profiles = current.profiles + created)
+                ) {
+                    onChanged()
+                    dialog.dismiss()
+                    profileActions(context, created.id, onChanged)
+                }
             }
-            negativeButton(R.string.action_discard)
+            negativeButton(R.string.action_discard) { it.dismiss() }
         }
     }
 
@@ -378,8 +463,8 @@ object ProfileEditors {
                     2 -> editWifi(context, profileId, onChanged)
                     3 -> editSim(context, profileId, onChanged)
                     4 -> {
-                        ConfigGateway.get().writeProfileStore(store.copy(defaultProfileId = profileId))
-                        onChanged()
+                        val current = ConfigGateway.get().readProfileStore()
+                        save(context, current.copy(defaultProfileId = profileId), onChanged)
                     }
                     5 -> renameProfile(context, profileId, onChanged)
                     6 -> deleteProfile(context, profileId, onChanged)
@@ -393,15 +478,21 @@ object ProfileEditors {
         val profile = store.profiles.firstOrNull { it.id == profileId } ?: return
 
         MaterialDialog(context).show {
+            noAutoDismiss()
             title(R.string.profile_action_rename)
-            input(hintRes = R.string.profile_name_hint, prefill = profile.name) { _, text ->
+            input(hintRes = R.string.profile_name_hint, prefill = profile.name) { dialog, text ->
                 val name = text.toString().trim()
                 if (name.isEmpty()) return@input
 
-                ConfigGateway.get().writeProfileStore(store.replacing(profile.copy(name = name)))
-                onChanged()
+                val current = ConfigGateway.get().readProfileStore()
+                val latest = current.profiles.firstOrNull { it.id == profileId }
+                    ?: return@input
+                save(context, current.replacing(latest.copy(name = name))) {
+                    onChanged()
+                    dialog.dismiss()
+                }
             }
-            negativeButton(R.string.action_discard)
+            negativeButton(R.string.action_discard) { it.dismiss() }
         }
     }
 
@@ -419,27 +510,32 @@ object ProfileEditors {
         }
 
         MaterialDialog(context).show {
+            noAutoDismiss()
             title(R.string.profile_action_delete)
             message(R.string.profile_delete_confirm)
-            positiveButton(R.string.profile_action_delete) {
-                val remaining = store.profiles.filterNot { it.id == profileId }
+            positiveButton(R.string.profile_action_delete) { dialog ->
+                val current = ConfigGateway.get().readProfileStore()
+                if (current.profiles.size <= 1) return@positiveButton
+                val remaining = current.profiles.filterNot { it.id == profileId }
 
-                ConfigGateway.get().writeProfileStore(
-                    store.copy(
+                save(context,
+                    current.copy(
                         profiles = remaining,
                         // Apps pointed here fall back to the default, and the
                         // default itself moves if it was the one deleted.
-                        defaultProfileId = if (store.defaultProfileId == profileId) {
+                        defaultProfileId = if (current.defaultProfileId == profileId) {
                             remaining.first().id
                         } else {
-                            store.defaultProfileId
+                            current.defaultProfileId
                         },
-                        assignments = store.assignments.filterValues { it != profileId },
+                        assignments = current.assignments.filterValues { it != profileId },
                     )
-                )
-                onChanged()
+                ) {
+                    onChanged()
+                    dialog.dismiss()
+                }
             }
-            negativeButton(R.string.action_discard)
+            negativeButton(R.string.action_discard) { it.dismiss() }
         }
     }
 
@@ -461,18 +557,45 @@ object ProfileEditors {
         MaterialDialog(context).show {
             title(R.string.profile_assign_title)
             listItems(items = labels) { _, index, _ ->
+                val current = ConfigGateway.get().readProfileStore()
                 // Following the default is the absence of an assignment, so
                 // picking it drops the entry rather than storing a sentinel.
-                val assignments = if (index == 0) store.assignments - packageName
-                else store.assignments + (packageName to store.profiles[index - 1].id)
+                val selectedId = store.profiles.getOrNull(index - 1)?.id
+                val assignments = if (index == 0 || selectedId == null) {
+                    current.assignments - packageName
+                } else {
+                    current.assignments + (packageName to selectedId)
+                }
 
-                ConfigGateway.get().writeProfileStore(store.copy(assignments = assignments))
-                onChanged()
-
-                if (index > 0) {
-                    offerPlayServices(context, store.profiles[index - 1], packageName, onChanged)
+                save(context, current.copy(assignments = assignments)) {
+                    onChanged()
+                    val selected = selectedId?.let { id ->
+                        current.profiles.firstOrNull { it.id == id }
+                    } ?: current.defaultProfile() ?: return@save
+                    offerTargetScope(context, selected, packageName) {
+                        offerPlayServices(context, selected, packageName, onChanged)
+                    }
                 }
             }
+        }
+    }
+
+    /** SIM properties and locale are hooked inside the target app process. */
+    private fun offerTargetScope(
+        context: Context,
+        profile: Profile,
+        packageName: String,
+        afterwards: () -> Unit,
+    ) {
+        if (!profile.simEnabled && !profile.localeEnabled) {
+            afterwards()
+            return
+        }
+
+        MaterialDialog(context).show {
+            title(R.string.target_scope_title)
+            message(text = context.getString(R.string.target_scope_message, packageName))
+            positiveButton(R.string.action_ok) { afterwards() }
         }
     }
 
@@ -505,12 +628,11 @@ object ProfileEditors {
             positiveButton(R.string.play_services_assign) {
                 val current = ConfigGateway.get().readProfileStore()
 
-                ConfigGateway.get().writeProfileStore(
+                save(context,
                     current.copy(
                         assignments = current.assignments + (PLAY_SERVICES to profile.id)
                     )
-                )
-                onChanged()
+                ) { onChanged() }
             }
             negativeButton(R.string.action_not_now)
         }
@@ -541,6 +663,20 @@ object ProfileEditors {
     // endregion
 
     // region helpers
+
+    private fun save(
+        context: Context,
+        store: ProfileStore,
+        onSuccess: () -> Unit = {},
+    ): Boolean {
+        if (ConfigGateway.get().writeProfileStore(store)) {
+            onSuccess()
+            return true
+        }
+
+        Toast.makeText(context, R.string.config_save_failed, Toast.LENGTH_LONG).show()
+        return false
+    }
 
     /**
      * Keeps the ECI and the eNodeB/sector pair showing the same identity while

@@ -42,7 +42,7 @@ class ProfileTest {
     @Test
     fun `jitter is not stuck at the centre`() {
         val profile = Profile(x = 24.9581, y = 121.2198, offset = 50.0)
-        val positions = (1..200).map { profile.jitteredPosition() }.toSet()
+        val positions = (1..200).map { profile.jitteredPosition(it * 1_000L) }.toSet()
 
         assertTrue("expected varied positions, got ${positions.size}", positions.size > 100)
     }
@@ -55,8 +55,12 @@ class ProfileTest {
         val equator = Profile(x = 0.0, y = 0.0, offset = 1000.0)
         val north = Profile(x = 60.0, y = 0.0, offset = 1000.0)
 
-        val equatorSpread = (1..4000).maxOf { kotlin.math.abs(equator.jitteredPosition().second) }
-        val northSpread = (1..4000).maxOf { kotlin.math.abs(north.jitteredPosition().second) }
+        val equatorSpread = (1..4000).maxOf {
+            kotlin.math.abs(equator.jitteredPosition(it * 1_000L).second)
+        }
+        val northSpread = (1..4000).maxOf {
+            kotlin.math.abs(north.jitteredPosition(it * 1_000L).second)
+        }
 
         assertTrue("equator $equatorSpread vs north $northSpread", northSpread > equatorSpread * 1.5)
     }

@@ -4,7 +4,9 @@ import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.AndroidAppHelper
 import android.content.Context
+import android.os.Binder
 import android.os.SystemClock
+import fuck.location.BuildConfig
 import fuck.location.xposed.helpers.reflect.*
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.JsonDataException
@@ -19,10 +21,12 @@ import fuck.location.app.ui.models.Profile
 import fuck.location.app.ui.models.ProfileStore
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.io.File
+import java.io.FileOutputStream
 import java.io.FileNotFoundException
 import java.lang.Exception
 import java.lang.IllegalArgumentException
 import java.lang.reflect.Field
+import java.lang.reflect.Method
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -35,6 +39,8 @@ class ConfigGateway private constructor() {
     // Magic number to identify whether this call is from our module
     private val magicNumber = -114514
     private val magicNumberLocation = -191931
+    private val profileQueryPrefix = "$magicNumberLocation:"
+    private val profileReadError = "__FL_PROFILE_READ_ERROR__"
 
     // Every ProfileStore field has a default, so this parses into a usable config
     private val EMPTY_CONFIG = "{}"
@@ -51,11 +57,14 @@ class ConfigGateway private constructor() {
      * picks a change up within the window.
      */
     private val cacheMillis = 2_000L
-    private var cachedStore: ProfileStore? = null
-    private var cachedAt = 0L
+    @Volatile private var cachedStore: ProfileStore? = null
+    @Volatile private var cachedAt = 0L
 
     /** Last logged resolution per package; hooks resolve from many threads. */
     private val announced = ConcurrentHashMap<String, String>()
+    private data class CachedProfile(val profile: Profile?, val at: Long)
+    private val cachedProfiles = ConcurrentHashMap<String, CachedProfile>()
+    private val lastServedProfiles = ConcurrentHashMap<String, String>()
 
     /* For getting started in framework. In default, it judges whether a
      * packageName is in whiteList.json or not.
@@ -85,10 +94,15 @@ class ConfigGateway private constructor() {
         const val SYSTEM_DIR = "/data/system"
         const val CONFIG_DIR_PREFIX = "fuck_location"
         const val LEGACY_CONFIG_DIR = "fuck_location_test"
+        const val ROOT_UID = 0
+        const val SYSTEM_UID = 1_000
+        const val PHONE_UID = 1_001
 
         /** Keys that only a pre-profile config carries. */
         private val LEGACY_KEYS =
             setOf("x", "y", "offset", "eci", "pci", "tac", "earfcn", "bandwidth")
+        private val hookedWriteMethods = ConcurrentHashMap.newKeySet<Method>()
+        private val hookedReadMethods = ConcurrentHashMap.newKeySet<Method>()
     }
 
     @ExperimentalStdlibApi
@@ -97,18 +111,35 @@ class ConfigGateway private constructor() {
         val clazz = classLoader.loadClass("com.android.server.am.ActivityManagerService")
 
         val methods = findAllMethods(clazz, findSuper = true) {
-            name == "setProcessMemoryTrimLevel" && isPublic
+            name == "setProcessMemoryTrimLevel" && isPublic && parameterCount == 3 &&
+                parameterTypes[0] == String::class.java &&
+                parameterTypes[1] == Int::class.javaPrimitiveType &&
+                parameterTypes[2] == Int::class.javaPrimitiveType
         }.takeIf { it.isNotEmpty() }
             ?: throw NoSuchMethodException("setProcessMemoryTrimLevel not found in ${clazz.name}")
 
-        methods.hookMethod {
-            before { param ->
-                if (param.args[1] == magicNumber && param.args[2] == 3) {
-                    writeConfigInternal(param)
-                    return@before
+        var failure: Throwable? = null
+        methods.filter { hookedWriteMethods.add(it) }.forEach { method ->
+            try {
+                method.hookMethod {
+                    before { param ->
+                        if (param.args[1] == magicNumber && param.args[2] == 3) {
+                            if (!callerOwnsPackage(BuildConfig.APPLICATION_ID)) {
+                                Log.w("rejecting config write from uid ${Binder.getCallingUid()}")
+                                param.result = false
+                                return@before
+                            }
+                            writeConfigInternal(param)
+                            return@before
+                        }
+                    }
                 }
+            } catch (t: Throwable) {
+                hookedWriteMethods.remove(method)
+                failure = t
             }
         }
+        failure?.let { throw it }
     }
 
     @SuppressLint("PrivateApi")
@@ -134,24 +165,138 @@ class ConfigGateway private constructor() {
             }.getOrNull()
         } ?: throw NoSuchMethodException("getInstallerPackageName not found in any of $candidates")
 
-        methods.hookMethod {
-            before { param ->
-                when {
-                    param.args[0] == magicNumber.toString() -> {
-                        readPackageListInternal(param)
-                    }
-                    param.args[0] == magicNumberLocation.toString() -> {
-                        readConfigInternal(param)
+        var failure: Throwable? = null
+        methods.filter { hookedReadMethods.add(it) }.forEach { method ->
+            try {
+                method.hookMethod {
+                    before { param ->
+                        when {
+                            param.args[0] == magicNumber.toString() -> {
+                                if (!callerOwnsPackage(BuildConfig.APPLICATION_ID)) {
+                                    param.result = null
+                                    return@before
+                                }
+                                readPackageListInternal(param)
+                            }
+                            param.args[0] == magicNumberLocation.toString() -> {
+                                if (!callerOwnsPackage(BuildConfig.APPLICATION_ID)) {
+                                    param.result = null
+                                    return@before
+                                }
+                                readConfigInternal(param)
+                                return@before
+                            }
+                            (param.args[0] as? String)?.startsWith(profileQueryPrefix) == true -> {
+                                val packageName =
+                                    (param.args[0] as String).removePrefix(profileQueryPrefix)
+                                if (!callerMayQuery(packageName)) {
+                                    Log.w("rejecting profile query for $packageName from uid " +
+                                        Binder.getCallingUid())
+                                    param.result = null
+                                    return@before
+                                }
+                                readProfileInternal(param, packageName)
+                                return@before
+                            }
+                        }
                         return@before
                     }
                 }
-                return@before
+            } catch (t: Throwable) {
+                hookedReadMethods.remove(method)
+                failure = t
             }
         }
+        failure?.let { throw it }
+    }
+
+    @ExperimentalStdlibApi
+    @Synchronized
+    private fun readProfileInternal(
+        param: XC_MethodHook.MethodHookParam,
+        packageName: String,
+    ) {
+        val json = try {
+            readValidConfigJson()
+        } catch (t: Throwable) {
+            Log.w("cannot read profile for $packageName: $t")
+            param.result = lastServedProfiles[packageName] ?: profileReadError
+            return
+        }
+
+        param.result = try {
+            val profile = parseProfileStore(json).profileFor(packageName.substringBefore(':'))
+            val adapter: JsonAdapter<Profile> = moshi.adapter()
+            (profile?.let(adapter::toJson) ?: "null").also {
+                lastServedProfiles[packageName] = it
+            }
+        } catch (t: Throwable) {
+            Log.w("cannot resolve profile for $packageName: $t")
+            lastServedProfiles[packageName] ?: profileReadError
+        }
+    }
+
+    private fun callerMayQuery(packageName: String): Boolean {
+        val uid = Binder.getCallingUid()
+        return uid == ROOT_UID || uid == SYSTEM_UID || uid == PHONE_UID ||
+            packagesForUid(uid).any { it == packageName.substringBefore(':') }
+    }
+
+    private fun callerOwnsPackage(packageName: String): Boolean =
+        packagesForUid(Binder.getCallingUid()).any { it == packageName }
+
+    private fun packagesForUid(uid: Int): List<String> {
+        try {
+            val appGlobals = Class.forName("android.app.AppGlobals")
+            val packageManager = HiddenApiBypass.invoke(
+                appGlobals,
+                null,
+                "getPackageManager",
+            ) ?: throw IllegalStateException("AppGlobals has no package manager")
+            val packages = (HiddenApiBypass.invoke(
+                packageManager.javaClass,
+                packageManager,
+                "getPackagesForUid",
+                uid,
+            ) as? Array<*>)?.filterIsInstance<String>().orEmpty()
+            if (packages.isNotEmpty()) return packages
+        } catch (t: Throwable) {
+            Log.w("AppGlobals cannot resolve packages for uid $uid: $t")
+        }
+
+        // Vector builds differ in which hidden-API exemptions reach
+        // system_server. Fall back to its system Context, then to the Context
+        // already supplied by an ordinary Application.attach.
+        return try {
+            val context = systemContext() ?: if (this::customContext.isInitialized) {
+                customContext
+            } else null
+            context?.packageManager?.getPackagesForUid(uid)?.toList().orEmpty()
+        } catch (t: Throwable) {
+            Log.w("system Context cannot resolve packages for uid $uid: $t")
+            emptyList()
+        }
+    }
+
+    private fun systemContext(): Context? = try {
+        val activityThread = Class.forName("android.app.ActivityThread")
+        val thread = HiddenApiBypass.invoke(
+            activityThread,
+            null,
+            "currentActivityThread",
+        ) ?: return null
+        HiddenApiBypass.invoke(
+            thread.javaClass,
+            thread,
+            "getSystemContext",
+        ) as? Context
+    } catch (_: Throwable) {
+        null
     }
 
 
     @ExperimentalStdlibApi
+    @Synchronized
     private fun readPackageListInternal(param: XC_MethodHook.MethodHookParam) {
         var jsonFile = File("$dataDir/whiteList.json")
 
@@ -173,39 +318,37 @@ class ConfigGateway private constructor() {
     }
 
     @ExperimentalStdlibApi
+    @Synchronized
     private fun readConfigInternal(param: XC_MethodHook.MethodHookParam) {
-        // Name kept from before profiles existed so upgrades find the config
-        var jsonFile = File("$dataDir/fakeLocation.json")
-
         try {
-            if (!jsonFile.exists()) {
-                val jsonFileDirectory = File("$dataDir/")
-                jsonFileDirectory.mkdirs()
-            }
-
-            val json: String = try {
-                jsonFile.readText()
-            } catch (e: FileNotFoundException) {
-                Log.d("FL: fakeLocation.json not found. Trying to refresh File holder")
-                try {
-                    jsonFile = File("$dataDir/fakeLocation.json")
-                    jsonFile.readText()
-                    Log.d("FL: fakeLocation.json resumed.")
-                } catch (e: FileNotFoundException) {
-                    Log.d("FL: not possible to refresh. Falling back to defaults")
-                }
-                EMPTY_CONFIG
-            }
-
-            param.result = json
+            param.result = readValidConfigJson()
         } catch (e: Exception) {
-            XposedBridge.log("FL: [debug !!] Fuck with exceptions! $e")
-
+            Log.e("both the primary and backup config are unreadable", e)
             param.result = EMPTY_CONFIG
         }
     }
 
+    @ExperimentalStdlibApi
+    private fun readValidConfigJson(): String {
+        val primary = File(dataDir, "fakeLocation.json")
+        if (primary.exists()) {
+            try {
+                return primary.readText().also { parseProfileStore(it) }
+            } catch (primaryFailure: Throwable) {
+                Log.w("primary config is unreadable, trying backup: $primaryFailure")
+            }
+        }
 
+        val backup = File(dataDir, "fakeLocation.json.bak")
+        if (!backup.exists()) return EMPTY_CONFIG
+        return backup.readText().also {
+            parseProfileStore(it)
+            Log.w("using the last valid backup config")
+        }
+    }
+
+
+    @Synchronized
     private fun writeConfigInternal(param: XC_MethodHook.MethodHookParam) {
         if (!this::dataDir.isInitialized) {
             Log.e("no config directory resolved, so the config cannot be saved")
@@ -213,23 +356,53 @@ class ConfigGateway private constructor() {
             return
         }
 
-        val jsonFile = File("$dataDir/fakeLocation.json")
-
-        if (!jsonFile.exists()) {
-            val jsonFileDirectory = File("$dataDir/")
-            jsonFileDirectory.mkdirs()
+        val directory = File(dataDir)
+        if (!directory.exists() && !directory.mkdirs()) {
+            Log.e("cannot create config directory $directory")
+            param.result = false
+            return
         }
 
-        jsonFile.writeText(param.args[0] as String)
-
-        param.result = false    // Block from calling real method
+        val jsonFile = File(directory, "fakeLocation.json")
+        val json = param.args[0] as String
+        try {
+            parseProfileStore(json)
+        } catch (t: Throwable) {
+            Log.e("refusing to save an invalid config", t)
+            param.result = false
+            return
+        }
+        val temporary = File.createTempFile("fakeLocation.", ".tmp", directory)
+        try {
+            FileOutputStream(temporary).use { output ->
+                output.write(json.toByteArray(Charsets.UTF_8))
+                output.fd.sync()
+            }
+            if (jsonFile.isFile) {
+                jsonFile.copyTo(File(directory, "fakeLocation.json.bak"), overwrite = true)
+            }
+            if (!temporary.renameTo(jsonFile)) {
+                throw IllegalStateException("cannot atomically replace $jsonFile")
+            }
+            // This method normally returns boolean. true is also the protocol
+            // acknowledgement consumed by writeProfileStore in the app.
+            param.result = true
+        } catch (t: Throwable) {
+            Log.e("cannot save config atomically", t)
+            temporary.delete()
+            param.result = false
+        }
     }
 
     private fun universalAPICaller(string: String, action: Int): Any? {
         val magicContext: Context = try {
-            AndroidAppHelper.currentApplication().applicationContext // Calling from xposed hook
-        } catch (e: NoClassDefFoundError) {
-            customContext   // Calling from normal code
+            AndroidAppHelper.currentApplication()?.applicationContext
+        } catch (_: NoClassDefFoundError) {
+            null
+        } ?: if (this::customContext.isInitialized) {
+            customContext
+        } else {
+            throw IllegalStateException("no application Context is available yet")
         }
 
         val activityManager =
@@ -247,6 +420,11 @@ class ConfigGateway private constructor() {
                 packageManager.javaClass,
                 packageManager,
                 "getInstallerPackageName", magicNumberLocation.toString()
+            )
+            5 -> HiddenApiBypass.invoke(
+                packageManager.javaClass,
+                packageManager,
+                "getInstallerPackageName", profileQueryPrefix + string
             )
             else -> HiddenApiBypass.invoke(
                 activityManager.javaClass,
@@ -266,10 +444,40 @@ class ConfigGateway private constructor() {
     @ExperimentalStdlibApi
     fun profileFor(packageName: String): Profile? {
         val app = packageName.substringBefore(':')
-        val profile = readProfileStore().profileFor(app)
+        val now = SystemClock.elapsedRealtime()
+        val cached = cachedProfiles[app]
+        val profile = if (cached != null && now - cached.at < cacheMillis) {
+            cached.profile
+        } else {
+            readResolvedProfile(app).also { cachedProfiles[app] = CachedProfile(it, now) }
+        }
 
         announce(app, profile)
         return profile
+    }
+
+    @ExperimentalStdlibApi
+    private fun readResolvedProfile(packageName: String): Profile? {
+        val json = try {
+            universalAPICaller(packageName, 5) as? String
+                ?: throw IllegalStateException("profile channel returned null")
+        } catch (t: Throwable) {
+            Log.w("Cannot resolve profile for $packageName: $t")
+            return cachedProfiles[packageName]?.profile
+        }
+        if (json == profileReadError) {
+            Log.w("Profile query for $packageName failed; keeping the last valid copy")
+            return cachedProfiles[packageName]?.profile
+        }
+        if (json == "null") return null
+
+        return try {
+            val adapter: JsonAdapter<Profile> = moshi.adapter()
+            adapter.fromJson(json)
+        } catch (t: Throwable) {
+            Log.w("Profile for $packageName is unreadable: $t")
+            cachedProfiles[packageName]?.profile
+        }
     }
 
     /**
@@ -324,10 +532,10 @@ class ConfigGateway private constructor() {
     fun readPackageList(): List<String>? {
         val jsonAdapter: JsonAdapter<List<String>> = moshi.adapter()
         val json = try {
-            universalAPICaller("None", 2) as String
+            universalAPICaller("None", 2) as? String ?: return null
         } catch (e: Exception) {
-            Log.w("Failed to read package list, falling back to []")
-            "[]"
+            Log.w("Failed to read package list: $e")
+            return null
         }
 
         return jsonAdapter.fromJson(json)
@@ -351,10 +559,13 @@ class ConfigGateway private constructor() {
         if (store.configVersion >= ProfileStore.CURRENT_CONFIG_VERSION) return
 
         val whitelisted = try {
-            readPackageList().orEmpty()
+            readPackageList()
         } catch (e: Exception) {
-            Log.w("No legacy whitelist to fold in: $e")
-            emptyList()
+            Log.w("Cannot read the legacy whitelist; migration postponed: $e")
+            null
+        } ?: run {
+            Log.w("Cannot read the legacy whitelist; migration postponed")
+            return
         }
 
         if (whitelisted.isEmpty()) {
@@ -415,6 +626,7 @@ class ConfigGateway private constructor() {
     }
 
     @ExperimentalStdlibApi
+    @Synchronized
     fun readProfileStore(): ProfileStore {
         val now = SystemClock.elapsedRealtime()
         cachedStore?.let { if (now - cachedAt < cacheMillis) return it }
@@ -429,17 +641,16 @@ class ConfigGateway private constructor() {
                     "the framework side did not answer; is system_server in the module's scope?"
                 )
         } catch (e: Exception) {
-            Log.w("Cannot read the config, so nothing will be spoofed: $e")
-            EMPTY_CONFIG
+            Log.w("Cannot read the config: $e")
+            return cachedStore ?: ProfileStore()
         }
 
         val store = try {
             parseProfileStore(json)
         } catch (e: Exception) {
-            // A malformed config must not take the module down with it: report
-            // it and behave as if nothing were configured.
-            Log.w("Config is unreadable, falling back to defaults: $e")
-            ProfileStore()
+            // Keep the last complete store on a transient or partial read.
+            Log.w("Config is unreadable, keeping the last valid copy: $e")
+            return cachedStore ?: ProfileStore()
         }
 
         return store.also { remember(it, now) }
@@ -481,7 +692,11 @@ class ConfigGateway private constructor() {
 
         val json: String = jsonAdapter.toJson(store)
         try {
-            universalAPICaller(json, 3)
+            val acknowledged = universalAPICaller(json, 3) as? Boolean
+            if (acknowledged != true) {
+                Log.e("Cannot save the config; system_server rejected the write")
+                return false
+            }
         } catch (t: Throwable) {
             // If the system_server half is absent, this falls through to the
             // real privileged API and throws "Only shell can call it". A
@@ -497,11 +712,14 @@ class ConfigGateway private constructor() {
         return true
     }
 
+    @Synchronized
     private fun remember(store: ProfileStore, at: Long) {
         cachedStore = store
         cachedAt = at
+        cachedProfiles.clear()
     }
 
+    @Synchronized
     fun setCustomContext(context: Context) {
         customContext = context
 
@@ -513,6 +731,7 @@ class ConfigGateway private constructor() {
         // so make the next read go back to system_server.
         cachedStore = null
         cachedAt = 0L
+        cachedProfiles.clear()
     }
 
     // For converting CallerIdentity to packageName
@@ -584,6 +803,7 @@ class ConfigGateway private constructor() {
      * failed search leaves the path unset and says so, and system_server asks
      * again when it installs its hooks.
      */
+    @Synchronized
     fun setDataPath() {
         if (this::dataDir.isInitialized) return
 
@@ -598,7 +818,10 @@ class ConfigGateway private constructor() {
         if (names.contains(LEGACY_CONFIG_DIR)) {
             val randomized = newConfigDirName()
             Log.i("migrating $LEGACY_CONFIG_DIR to $randomized")
-            File(SYSTEM_DIR, LEGACY_CONFIG_DIR).renameTo(File(SYSTEM_DIR, randomized))
+            if (!File(SYSTEM_DIR, LEGACY_CONFIG_DIR)
+                    .renameTo(File(SYSTEM_DIR, randomized))) {
+                Log.w("could not rename legacy config directory; continuing to use it")
+            }
         }
 
         val existing = File(SYSTEM_DIR).list()
@@ -606,16 +829,29 @@ class ConfigGateway private constructor() {
             .filter { it.startsWith(CONFIG_DIR_PREFIX) }
             .sorted()
 
-        // Sorted, so a device that somehow ended up with more than one keeps
-        // choosing the same one rather than alternating between them. The
-        // strays are left alone: one of them may be the config that matters,
-        // and deleting the wrong one cannot be undone.
+        // Prefer a directory carrying the newest real config. Old Vector
+        // startup races could leave several empty/random directories behind;
+        // lexicographic order selected those instead of the user's data.
         if (existing.size > 1) {
             Log.w("more than one config directory in $SYSTEM_DIR: $existing")
         }
 
-        dataDir = "$SYSTEM_DIR/${existing.firstOrNull() ?: newConfigDirName()}"
+        val selected = existing
+            .map { File(SYSTEM_DIR, it) }
+            .maxWithOrNull(compareBy<File> {
+                File(it, "fakeLocation.json").takeIf(File::isFile)?.lastModified() ?: -1L
+            }.thenBy { it.name })
+            ?.name
+            ?: newConfigDirName()
+        dataDir = "$SYSTEM_DIR/$selected"
         Log.i("config directory: $dataDir")
+    }
+
+    fun requireDataPath() {
+        setDataPath()
+        if (!this::dataDir.isInitialized) {
+            throw IllegalStateException("config directory is not available in this process")
+        }
     }
 
     private fun newConfigDirName() = "${CONFIG_DIR_PREFIX}_${generateRandomAppendix()}"

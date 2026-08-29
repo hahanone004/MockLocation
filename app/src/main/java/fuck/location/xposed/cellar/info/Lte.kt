@@ -5,6 +5,7 @@ import android.telephony.CellInfo
 import android.telephony.CellInfoLte
 import android.os.SystemClock
 import android.telephony.CellSignalStrengthLte
+import android.os.Parcel
 import fuck.location.app.ui.models.Profile
 import fuck.location.xposed.helpers.reflect.findField
 import fuck.location.xposed.cellar.identity.Lte
@@ -22,11 +23,15 @@ class Lte {
     @ExperimentalStdlibApi
     fun cellInfo(profile: Profile, reported: CellInfoLte? = null): CellInfoLte {
         if (reported != null) {
-            val identityField = findField(reported.javaClass) { name == "mCellIdentityLte" }
-            val existing = identityField.get(reported) as CellIdentityLte
+            // TelephonyRegistry keeps and reuses the modem's CellInfo objects
+            // for every listener. Mutating the supplied instance would leak one
+            // app's spoof into the system cache and then into unrelated apps.
+            val copied = copyOf(reported)
+            val identityField = findField(copied.javaClass) { name == "mCellIdentityLte" }
+            val existing = identityField.get(copied) as CellIdentityLte
 
-            identityField.set(reported, Lte().cellIdentity(profile, existing))
-            return reported
+            identityField.set(copied, Lte().cellIdentity(profile, existing))
+            return copied
         }
 
         val built = HiddenApiBypass.newInstance(CellInfoLte::class.java) as CellInfoLte
@@ -69,4 +74,15 @@ class Lte {
             -85, -95, -10, 10,
             CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE, CellInfo.UNAVAILABLE,
         ) as CellSignalStrengthLte
+
+    private fun copyOf(source: CellInfoLte): CellInfoLte {
+        val parcel = Parcel.obtain()
+        return try {
+            source.writeToParcel(parcel, 0)
+            parcel.setDataPosition(0)
+            CellInfoLte.CREATOR.createFromParcel(parcel)
+        } finally {
+            parcel.recycle()
+        }
+    }
 }
