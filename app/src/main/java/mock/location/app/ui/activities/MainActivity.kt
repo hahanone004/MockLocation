@@ -1,6 +1,7 @@
 package mock.location.app.ui.activities
 
 import android.annotation.SuppressLint
+import android.content.res.ColorStateList
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -11,6 +12,7 @@ import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
+import androidx.core.widget.ImageViewCompat
 import mock.location.R
 import mock.location.app.ui.config.ProfileEditors
 import mock.location.databinding.ActivityMainBinding
@@ -77,19 +79,23 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
     private fun setModuleState(binding: ActivityMainBinding) {
         if (isModuleActivated()) {
-            binding.moduleStatusCard.setCardBackgroundColor(getColor(R.color.purple_500))
+            val foreground = getColor(R.color.module_on_active_container)
+            binding.moduleStatusCard.setCardBackgroundColor(getColor(R.color.module_active_container))
             binding.moduleStatusIcon.setImageDrawable(AppCompatResources.getDrawable(this,
                 R.drawable.baseline_check_circle_24
             ))
+            tintStatus(binding, foreground)
             binding.moduleStatusText.text = getString(R.string.card_title_activated)
             binding.serviceStatusText.text = getString(R.string.card_detail_activated)
 
             binding.serveTimes.text = getString(R.string.card_framework_checking)
         } else {
-            binding.moduleStatusCard.setCardBackgroundColor(getColor(R.color.red_500))
+            val foreground = getColor(R.color.module_on_inactive_container)
+            binding.moduleStatusCard.setCardBackgroundColor(getColor(R.color.module_inactive_container))
             binding.moduleStatusIcon.setImageDrawable(AppCompatResources.getDrawable(this,
                 R.drawable.baseline_error_24
             ))
+            tintStatus(binding, foreground)
             binding.moduleStatusText.text = getText(R.string.card_title_not_activated)
             binding.serviceStatusText.text = getText(R.string.card_detail_not_activated)
             binding.serveTimes.visibility = View.GONE
@@ -97,6 +103,14 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             binding.menuProfiles.visibility = View.GONE
             binding.menuLocationCredit.visibility = View.GONE
         }
+    }
+
+    private fun tintStatus(binding: ActivityMainBinding, color: Int) {
+        binding.moduleStatusLabel.setTextColor(color)
+        binding.moduleStatusText.setTextColor(color)
+        binding.serviceStatusText.setTextColor(color)
+        binding.serveTimes.setTextColor(color)
+        ImageViewCompat.setImageTintList(binding.moduleStatusIcon, ColorStateList.valueOf(color))
     }
 
     /**
@@ -127,7 +141,10 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
             val status = frameworkStatus()
             runOnMainThread {
-                if (!isFinishing && !isDestroyed) binding.serveTimes.text = status
+                if (!isFinishing && !isDestroyed) {
+                    binding.serviceStatusText.text = status.detail
+                    binding.serveTimes.text = status.summary
+                }
             }
         }
     }
@@ -138,17 +155,23 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
      * loaded into this app, while every spoof lives in system_server and needs
      * to be in the module's scope separately.
      */
-    private fun frameworkStatus(): String {
+    private fun frameworkStatus(): FrameworkStatus {
         if (!ConfigGateway.get().isFrameworkReachable()) {
-            return getString(R.string.card_framework_missing)
+            return FrameworkStatus(
+                getString(R.string.card_framework_disconnected),
+                getString(R.string.card_framework_missing),
+            )
         }
 
         val store = ConfigGateway.get().readProfileStore()
 
-        return getString(
-            R.string.card_framework_ready,
-            store.profiles.count { !it.spoofsNothing },
-            store.assignments.size,
+        return FrameworkStatus(
+            getString(R.string.card_framework_connected),
+            getString(
+                R.string.card_framework_ready,
+                store.profiles.count { !it.spoofsNothing },
+                store.assignments.size,
+            ),
         )
     }
 
@@ -161,4 +184,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         /** Once per process: the migration itself is idempotent, the reads are not free. */
         val migrationPending = AtomicBoolean(true)
     }
+
+    private data class FrameworkStatus(val detail: String, val summary: String)
 }

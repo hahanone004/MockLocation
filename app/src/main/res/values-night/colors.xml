@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_primary">#AAC7FF</color>
+    <color name="brand_on_primary">#0A305F</color>
+    <color name="brand_primary_container">#274777</color>
+    <color name="brand_on_primary_container">#D6E3FF</color>
+    <color name="brand_secondary">#BEC6DC</color>
+    <color name="brand_secondary_container">#3E4758</color>
+    <color name="brand_on_secondary_container">#DAE2F9</color>
+
+    <color name="app_background">#111318</color>
+    <color name="app_surface">#1A1B20</color>
+    <color name="app_surface_variant">#23262E</color>
+    <color name="app_outline">#8E9099</color>
+    <color name="app_outline_variant">#44474F</color>
+    <color name="app_on_surface">#E2E2E9</color>
+    <color name="app_on_surface_variant">#C5C6CF</color>
+
+    <color name="module_active_container">#123B25</color>
+    <color name="module_on_active_container">#9DDBB1</color>
+    <color name="module_inactive_container">#5E171A</color>
+    <color name="module_on_inactive_container">#FFB4AB</color>
+
+    <color name="purple_200">#AAC7FF</color>
+    <color name="purple_500">#AAC7FF</color>
+    <color name="purple_700">#274777</color>
+    <color name="red_500">#FFB4AB</color>
+    <color name="teal_200">#B9CAC4</color>
+    <color name="teal_700">#82D5C4</color>
+</resources>

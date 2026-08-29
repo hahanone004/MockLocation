@@ -1,11 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="purple_200">#FFBB86FC</color>
-    <color name="purple_500">#FF6200EE</color>
-    <color name="purple_700">#FF3700B3</color>
-    <color name="red_500">#F44336</color>
-    <color name="teal_200">#FF03DAC5</color>
-    <color name="teal_700">#FF018786</color>
+    <color name="brand_primary">#405D8C</color>
+    <color name="brand_on_primary">#FFFFFF</color>
+    <color name="brand_primary_container">#D6E3FF</color>
+    <color name="brand_on_primary_container">#001B3E</color>
+    <color name="brand_secondary">#565F71</color>
+    <color name="brand_secondary_container">#DAE2F9</color>
+    <color name="brand_on_secondary_container">#131C2B</color>
+
+    <color name="app_background">#F9F9FF</color>
+    <color name="app_surface">#FFFFFF</color>
+    <color name="app_surface_variant">#EEF1F8</color>
+    <color name="app_outline">#C5C6CF</color>
+    <color name="app_outline_variant">#E1E2EA</color>
+    <color name="app_on_surface">#1A1B20</color>
+    <color name="app_on_surface_variant">#44474F</color>
+
+    <color name="module_active_container">#D0F5D8</color>
+    <color name="module_on_active_container">#0B522B</color>
+    <color name="module_inactive_container">#FFDAD6</color>
+    <color name="module_on_inactive_container">#93000A</color>
+
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="purple_200">#D6E3FF</color>
+    <color name="purple_500">#405D8C</color>
+    <color name="purple_700">#294675</color>
+    <color name="red_500">#BA1A1A</color>
+    <color name="teal_200">#B9CAC4</color>
+    <color name="teal_700">#3E665E</color>
 </resources>

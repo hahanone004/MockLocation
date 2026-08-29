@@ -57,6 +57,7 @@ class ModuleActivity : AppCompatActivity() {
         binding = ActivitySelectAppsBinding.inflate(layoutInflater)
         setContentView(binding.root)
         setSupportActionBar(binding.toolbar)
+        supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         recyclerView = binding.recycler
         oneAdapter = OneAdapter(recyclerView) {
@@ -71,6 +72,11 @@ class ModuleActivity : AppCompatActivity() {
 
         refreshLayout = binding.refreshLayout
         refreshLayout.setOnRefreshListener { refresh() }.autoRefresh()
+    }
+
+    override fun onSupportNavigateUp(): Boolean {
+        finish()
+        return true
     }
 
     /**
@@ -194,7 +200,10 @@ class ModuleActivity : AppCompatActivity() {
         val searchResult = if (keyword.isEmpty()) {
             snapshot
         } else {
-            snapshot.filter { it.title.lowercase().contains(keyword) }
+            snapshot.filter {
+                it.title.lowercase().contains(keyword) ||
+                    it.packageName.lowercase().contains(keyword)
+            }
         }
 
         runOnMainThread {
@@ -213,13 +222,16 @@ class ModuleActivity : AppCompatActivity() {
             }
             onBind { model, viewBinder, metadata ->
                 val title = viewBinder.findViewById<TextView>(R.id.app_list_module_title)
+                val packageName = viewBinder.findViewById<TextView>(R.id.app_list_module_package)
                 val icon = viewBinder.findViewById<ImageView>(R.id.app_list_module_icon)
                 val profile = viewBinder.findViewById<TextView>(R.id.app_list_module_profile)
 
                 title.text = model.title
+                packageName.text = model.packageName
                 icon.setImageDrawable(model.icon)
 
                 profile.text = model.profileLabel
+                profile.visibility = if (model.profileLabel.isBlank()) View.GONE else View.VISIBLE
             }
             eventHooks += ClickEventHook<AppListModel>().apply {
                 onClick { model, _, _ ->

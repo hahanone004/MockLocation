@@ -1,167 +1,296 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-    The toolbar belongs to the layout, not to the window decoration: as a decor
-    action bar it was drawn over the top of the content, so the status card sat
-    behind the "Mock Location" title bar.
--->
 <androidx.coordinatorlayout.widget.CoordinatorLayout
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fitsSystemWindows="true">
+    android:background="@color/app_background"
+    android:fitsSystemWindows="true"
+    tools:context=".app.ui.activities.MainActivity">
 
     <com.google.android.material.appbar.AppBarLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
-        android:fitsSystemWindows="true">
+        android:background="@color/app_background"
+        android:elevation="0dp"
+        android:fitsSystemWindows="true"
+        app:elevation="0dp">
 
         <com.google.android.material.appbar.MaterialToolbar
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
-            android:layout_height="?attr/actionBarSize"
-            android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
-            app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light" />
+            android:layout_height="72dp"
+            android:background="@color/app_background"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            app:titleTextAppearance="@style/TextAppearance.Material3.HeadlineMedium"
+            app:titleTextColor="@color/app_on_surface" />
     </com.google.android.material.appbar.AppBarLayout>
 
-    <RelativeLayout
+    <ScrollView
+        android:id="@+id/menu_scroll_bar"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:clipToPadding="false"
+        android:fillViewport="true"
+        android:paddingBottom="20dp"
+        android:scrollbars="none"
         app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-        <com.google.android.material.card.MaterialCardView
-            android:id="@+id/module_status_card"
-            style="@style/DefaultCard">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
 
-            <LinearLayout
-                style="@style/Default"
-                android:orientation="horizontal">
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/module_status_card"
+                style="@style/DefaultCard"
+                android:clickable="false"
+                android:focusable="false"
+                android:layout_marginTop="8dp"
+                app:cardBackgroundColor="@color/module_active_container"
+                app:cardCornerRadius="24dp"
+                app:strokeWidth="0dp">
 
-                <ImageView
-                    android:id="@+id/module_status_icon"
-                    style="@style/DefaultImage" />
-
-                <!--
-                    Weighted rather than match_parent: as match_parent it was as wide
-                    as the whole card even though the icon sits beside it, so any
-                    text long enough to wrap ran off the right edge.
-                -->
                 <LinearLayout
-                    style="@style/Default"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="16dp"
-                    android:orientation="vertical"
-                    android:paddingVertical="25dp">
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:minHeight="164dp"
+                    android:orientation="horizontal"
+                    android:padding="22dp">
 
-                    <TextView
-                        android:id="@+id/module_status_text"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:textColor="@android:color/white"
-                        android:textSize="18sp"
-                        android:textStyle="bold" />
+                        android:layout_weight="1"
+                        android:orientation="vertical">
 
-                    <TextView
-                        android:id="@+id/service_status_text"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="2dp"
-                        android:textAppearance="?attr/textAppearanceBody2"
-                        android:textColor="@android:color/white" />
+                        <TextView
+                            android:id="@+id/module_status_label"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:letterSpacing="0.08"
+                            android:text="@string/home_status_label"
+                            android:textAllCaps="true"
+                            android:textColor="@color/module_on_active_container"
+                            android:textSize="12sp"
+                            android:textStyle="bold" />
 
-                    <TextView
-                        android:id="@+id/serve_times"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="8dp"
-                        android:textColor="@android:color/white"
-                        android:textSize="12sp" />
+                        <TextView
+                            android:id="@+id/module_status_text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="10dp"
+                            android:textColor="@color/module_on_active_container"
+                            android:textSize="25sp"
+                            android:textStyle="bold"
+                            tools:text="模块已激活" />
+
+                        <TextView
+                            android:id="@+id/service_status_text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="4dp"
+                            android:textColor="@color/module_on_active_container"
+                            android:textSize="15sp"
+                            tools:text="系统框架已连接" />
+
+                        <TextView
+                            android:id="@+id/serve_times"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginTop="14dp"
+                            android:textColor="@color/module_on_active_container"
+                            android:textSize="13sp"
+                            tools:text="2 个配置已开启伪装 · 6 个应用已指派" />
+                    </LinearLayout>
+
+                    <ImageView
+                        android:id="@+id/module_status_icon"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:layout_marginStart="12dp"
+                        android:background="@drawable/status_icon_background"
+                        android:contentDescription="@null"
+                        android:padding="17dp"
+                        android:src="@drawable/baseline_check_circle_24"
+                        android:tint="@color/module_on_active_container" />
                 </LinearLayout>
-            </LinearLayout>
-
-        </com.google.android.material.card.MaterialCardView>
-
-        <ScrollView
-            android:id="@+id/menu_scroll_bar"
-            style="@style/Default"
-            android:layout_below="@id/module_status_card"
-            android:clipToPadding="false"
-            android:fillViewport="true"
-            android:paddingBottom="8dp"
-            android:scrollbars="none">
+            </com.google.android.material.card.MaterialCardView>
 
             <LinearLayout
-                style="@style/Default"
+                android:id="@+id/management_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
                 android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="24dp"
+                    android:layout_marginTop="28dp"
+                    android:layout_marginBottom="2dp"
+                    android:text="@string/home_section_manage"
+                    android:textColor="@color/app_on_surface"
+                    android:textSize="20sp"
+                    android:textStyle="bold" />
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/menu_location_credit"
-                    style="@style/DefaultCard"
-                    app:cardElevation="0dp">
+                    style="@style/DefaultCard">
 
                     <LinearLayout
-                        style="@style/Default"
-                        android:orientation="horizontal">
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:minHeight="88dp"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            app:cardBackgroundColor="@color/brand_primary_container"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="0dp">
+                            <ImageView
+                                style="@style/DefaultImage"
+                                android:layout_gravity="center"
+                                android:src="@drawable/baseline_apps_24" />
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView
+                                style="@style/DefaultText.Option.Card"
+                                android:text="@string/title_mocklocation_credit" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="3dp"
+                                android:text="@string/home_apps_subtitle"
+                                android:textColor="@color/app_on_surface_variant"
+                                android:textSize="14sp" />
+                        </LinearLayout>
 
                         <ImageView
-                            style="@style/DefaultImage"
-                            android:src="@drawable/baseline_credit_score_24" />
-
-                        <TextView
-                            style="@style/DefaultText.Option.Card"
-                            android:layout_width="wrap_content"
-                            android:gravity="center_vertical"
-                            android:text="@string/title_mocklocation_credit" />
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/baseline_chevron_right_24"
+                            android:tint="@color/app_on_surface_variant" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/menu_profiles"
-                    style="@style/DefaultCard"
-                    app:cardElevation="0dp">
+                    style="@style/DefaultCard">
 
                     <LinearLayout
-                        style="@style/Default"
-                        android:orientation="horizontal">
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:minHeight="88dp"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            app:cardBackgroundColor="@color/brand_primary_container"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="0dp">
+                            <ImageView
+                                style="@style/DefaultImage"
+                                android:layout_gravity="center"
+                                android:src="@drawable/baseline_layers_24" />
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView
+                                style="@style/DefaultText.Option.Card"
+                                android:text="@string/title_profiles" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="3dp"
+                                android:text="@string/home_profiles_subtitle"
+                                android:textColor="@color/app_on_surface_variant"
+                                android:textSize="14sp" />
+                        </LinearLayout>
 
                         <ImageView
-                            style="@style/DefaultImage"
-                            android:src="@drawable/baseline_layers_24" />
-
-                        <TextView
-                            style="@style/DefaultText.Option.Card"
-                            android:layout_width="wrap_content"
-                            android:gravity="center_vertical"
-                            android:text="@string/title_profiles" />
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/baseline_chevron_right_24"
+                            android:tint="@color/app_on_surface_variant" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
-
-
-
 
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/menu_about"
                     style="@style/DefaultCard"
-                    app:cardElevation="0dp">
+                    android:layout_marginBottom="8dp">
 
                     <LinearLayout
-                        style="@style/Default"
-                        android:orientation="horizontal">
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:minHeight="88dp"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            app:cardBackgroundColor="@color/brand_primary_container"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="0dp">
+                            <ImageView
+                                style="@style/DefaultImage"
+                                android:layout_gravity="center"
+                                android:src="@drawable/baseline_info_24" />
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView
+                                style="@style/DefaultText.Option.Card"
+                                android:text="@string/title_mocklocation_about" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="3dp"
+                                android:text="@string/home_about_subtitle"
+                                android:textColor="@color/app_on_surface_variant"
+                                android:textSize="14sp" />
+                        </LinearLayout>
 
                         <ImageView
-                            style="@style/DefaultImage"
-                            android:src="@drawable/baseline_info_24" />
-
-                        <TextView
-                            style="@style/DefaultText.Option.Card"
-                            android:layout_width="wrap_content"
-                            android:gravity="center_vertical"
-                            android:text="@string/title_mocklocation_about" />
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/baseline_chevron_right_24"
+                            android:tint="@color/app_on_surface_variant" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>
-        </ScrollView>
-    </RelativeLayout>
+        </LinearLayout>
+    </ScrollView>
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

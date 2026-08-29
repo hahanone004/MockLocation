@@ -3,10 +3,18 @@
     <string name="config_save_failed">Could not save: System Framework is not connected</string>
     <string name="cell_config_invalid">Invalid cell configuration. Check MCC, MNC and LTE value ranges.</string>
     <string name="app_name">Mock Location</string>
-    <string name="select_apps_activity_title">Select Apps</string>
+    <string name="select_apps_activity_title">App assignment</string>
 
-    <string name="title_mocklocation_credit">Location whitelist</string>
+    <string name="title_mocklocation_credit">App assignment</string>
     <string name="title_mocklocation_about">About this app</string>
+    <string name="home_section_manage">Manage</string>
+    <string name="home_status_label">SYSTEM STATUS</string>
+    <string name="home_apps_subtitle">Choose apps and assign an environment</string>
+    <string name="home_profiles_subtitle">Manage location, cell, Wi-Fi and SIM</string>
+    <string name="home_about_subtitle">Version, setup and compatibility</string>
+    <string name="app_list_helper">Assigned apps appear at the top of the list</string>
+    <string name="app_list_empty_title">No matching apps</string>
+    <string name="app_list_empty_detail">Try another app name or package name</string>
 
     <string name="title_profiles">Profiles</string>
     <string name="title_location_spoof">Location</string>
@@ -18,6 +26,7 @@
     <string name="action_discard">Discard</string>
     <string name="action_ok">OK</string>
     <string name="action_not_now">Not now</string>
+    <string name="action_search">Search apps</string>
 
     <string name="dialog_location_title">Location \u2014 %s</string>
     <string name="dialog_cell_title">Cell tower \u2014 %s</string>
@@ -92,7 +101,9 @@
     <string name="card_detail_not_activated">Make sure you have correctly set up this module</string>
 
     <string name="card_title_activated">Activated</string>
-    <string name="card_detail_activated">Go settings for further set up</string>
+    <string name="card_detail_activated">Module bridge is active</string>
+    <string name="card_framework_connected">System framework is connected</string>
+    <string name="card_framework_disconnected">System framework is not connected</string>
     <string name="card_framework_ready">%1$d profile(s) spoofing \u00b7 %2$d app(s) assigned</string>
     <string name="card_framework_checking">Checking the framework side\u2026</string>
     <string name="card_framework_missing">Not hooked into system_server \u2014 scope this module to System Framework in LSPosed and reboot</string>

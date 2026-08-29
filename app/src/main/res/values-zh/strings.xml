@@ -2,10 +2,18 @@
     <string name="config_save_failed">保存失败：未连接到系统框架</string>
     <string name="cell_config_invalid">基站配置无效，请检查 MCC、MNC 和 LTE 参数范围</string>
     <string name="app_name">Mock Location</string>
-    <string name="select_apps_activity_title">选择应用</string>
+    <string name="select_apps_activity_title">应用分配</string>
 
-    <string name="title_mocklocation_credit">位置白名单</string>
+    <string name="title_mocklocation_credit">应用分配</string>
     <string name="title_mocklocation_about">关于该应用</string>
+    <string name="home_section_manage">管理</string>
+    <string name="home_status_label">系统状态</string>
+    <string name="home_apps_subtitle">选择应用并指定运行环境</string>
+    <string name="home_profiles_subtitle">管理位置、基站、Wi-Fi 与 SIM</string>
+    <string name="home_about_subtitle">版本信息、使用说明与兼容性</string>
+    <string name="app_list_helper">已指派的应用会显示在列表顶部</string>
+    <string name="app_list_empty_title">没有找到应用</string>
+    <string name="app_list_empty_detail">试试搜索其他应用名称或包名</string>
 
     <string name="title_profiles">配置管理</string>
     <string name="title_location_spoof">位置伪装</string>
@@ -17,6 +25,7 @@
     <string name="action_discard">不保存</string>
     <string name="action_ok">知道了</string>
     <string name="action_not_now">先不用</string>
+    <string name="action_search">搜索应用</string>
 
     <string name="dialog_location_title">位置伪装 \u2014 %s</string>
     <string name="dialog_cell_title">基站伪装 \u2014 %s</string>
@@ -83,7 +92,9 @@
     <string name="card_detail_not_activated">请检查你是否已经正确激活了模块</string>
 
     <string name="card_title_activated">模块已经激活</string>
-    <string name="card_detail_activated">请前往“设置”以对模块进行进一步设定</string>
+    <string name="card_detail_activated">模块入口已加载</string>
+    <string name="card_framework_connected">系统框架已连接</string>
+    <string name="card_framework_disconnected">系统框架未连接</string>
     <string name="card_framework_ready">%1$d 个配置已开启伪装 \u00b7 %2$d 个应用已指派</string>
     <string name="card_framework_checking">正在检查框架端\u2026</string>
     <string name="card_framework_missing">未接入系统框架 \u2014 请在 LSPosed 勾选「系统框架」作用域后重启</string>

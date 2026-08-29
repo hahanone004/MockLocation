@@ -4,26 +4,34 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
+    android:orientation="vertical"
+    android:paddingBottom="8dp">
 
     <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/switch_wifi_enabled"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="8dp"
+        android:background="@drawable/switch_panel_background"
+        android:minHeight="64dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
         android:text="@string/switch_enable_wifi"
-        android:textSize="16sp" />
+        android:textColor="@color/app_on_surface"
+        android:textSize="15sp" />
 
-    <TextView style="@style/FieldLabel" android:text="@string/field_wifi_list" />
-
-    <EditText
-        android:id="@+id/field_wifi_list"
-        style="@style/FieldInput"
-        android:gravity="top|start"
-        android:inputType="textMultiLine|textNoSuggestions"
-        android:minLines="6"
-        android:textSize="15sp"
-        tools:ignore="Autofill,LabelFor" />
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/AppTextInputLayout"
+        android:hint="@string/field_wifi_list">
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/field_wifi_list"
+            style="@style/FieldInput"
+            android:fontFamily="monospace"
+            android:gravity="top|start"
+            android:inputType="textMultiLine|textNoSuggestions"
+            android:minLines="7"
+            android:textSize="14sp"
+            tools:ignore="Autofill" />
+    </com.google.android.material.textfield.TextInputLayout>
 
     <TextView
         style="@style/FieldLabel"
