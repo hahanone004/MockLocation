@@ -10,6 +10,7 @@
     <string name="title_location_spoof">Location</string>
     <string name="title_cell_spoof">Cell tower</string>
     <string name="title_wifi_spoof">Wi-Fi</string>
+    <string name="title_sim_spoof">SIM card</string>
 
     <string name="action_save">Save</string>
     <string name="action_discard">Discard</string>
@@ -18,6 +19,7 @@
     <string name="dialog_location_title">Location \u2014 %s</string>
     <string name="dialog_cell_title">Cell tower \u2014 %s</string>
     <string name="dialog_wifi_title">Wi-Fi \u2014 %s</string>
+    <string name="dialog_sim_title">SIM card \u2014 %s</string>
 
     <string name="field_latitude">Latitude</string>
     <string name="field_longitude">Longitude</string>
@@ -38,9 +40,23 @@
     <string name="field_wifi_list">Access points</string>
     <string name="field_wifi_hint">One per line: name | BSSID | signal dBm | frequency MHz. Only the name is required. An empty list reports no networks at all, which is itself conspicuous.</string>
 
+    <string name="field_sim_country">Country</string>
+    <string name="field_sim_carrier">Carrier</string>
+    <string name="field_phone_number">Phone number</string>
+    <string name="field_sim_serial">SIM serial number (ICCID)</string>
+    <string name="sim_generated_title">Derived from the carrier</string>
+    <string name="sim_carrier_unset">Not picked yet</string>
+    <string name="sim_pick_country">Country</string>
+    <string name="sim_pick_carrier">Carrier</string>
+    <string name="sim_summary_unset">Pick a carrier and the operator fields are filled in from it.</string>
+    <string name="sim_summary_format">Network country: %1$s\nNetwork operator: %2$s\nNetwork operator name: %3$s\nSIM country: %1$s\nSIM operator: %2$s\nSIM operator name: %3$s</string>
+    <string name="action_regenerate">Draw a new number and ICCID</string>
+    <string name="sim_hint">The number and the ICCID are made up to fit the carrier, and they stay put once drawn: a SIM whose serial changes between two calls gives itself away. Picking a carrier also sets the cell tower MCC and MNC, so the two cannot contradict each other.\n\nThe operator fields are read inside the app itself rather than over a system call, so LSPosed has to have this module scoped to that app for them to apply. The number and the ICCID work either way.</string>
+
     <string name="switch_enable_location">Spoof location for this profile</string>
     <string name="switch_enable_cell">Spoof cell tower for this profile</string>
     <string name="switch_enable_wifi">Spoof Wi-Fi for this profile</string>
+    <string name="switch_enable_sim">Spoof the SIM identity for this profile</string>
     <string name="profile_feature_on">%s \u00b7 on</string>
     <string name="profile_feature_off">%s \u00b7 off</string>
 

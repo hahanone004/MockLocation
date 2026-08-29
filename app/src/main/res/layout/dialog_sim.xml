@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switch_sim_enabled"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/switch_enable_sim"
+        android:textSize="16sp" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_sim_country" />
+
+    <TextView
+        android:id="@+id/field_sim_country"
+        style="@style/FieldInput"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_sim_carrier" />
+
+    <TextView
+        android:id="@+id/field_sim_carrier"
+        style="@style/FieldInput"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/sim_generated_title" />
+
+    <TextView
+        android:id="@+id/sim_summary"
+        style="@style/FieldInput"
+        android:textSize="15sp"
+        android:lineSpacingExtra="2dp" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_phone_number" />
+
+    <EditText
+        android:id="@+id/field_phone_number"
+        style="@style/FieldInput"
+        android:inputType="phone"
+        tools:ignore="Autofill,LabelFor" />
+
+    <TextView style="@style/FieldLabel" android:text="@string/field_sim_serial" />
+
+    <EditText
+        android:id="@+id/field_sim_serial"
+        style="@style/FieldInput"
+        android:inputType="number"
+        tools:ignore="Autofill,LabelFor" />
+
+    <Button
+        android:id="@+id/action_regenerate"
+        style="?attr/borderlessButtonStyle"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="@string/action_regenerate" />
+
+    <TextView
+        style="@style/FieldLabel"
+        android:text="@string/sim_hint" />
+</LinearLayout>

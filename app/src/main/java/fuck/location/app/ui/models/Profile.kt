@@ -32,6 +32,7 @@ data class Profile(
     val locationEnabled: Boolean = false,
     val cellEnabled: Boolean = false,
     val wifiEnabled: Boolean = false,
+    val simEnabled: Boolean = false,
 
     /** Latitude of the cell, and the position GPS reports. */
     val x: Double = 0.0,
@@ -50,6 +51,24 @@ data class Profile(
     val bandwidth: Int = 0,
 
     val wifiAccessPoints: List<FakeAccessPoint> = emptyList(),
+
+    /*
+     * The SIM identity. The user picks a country and a carrier; everything here
+     * is derived from that pair and then stored, so a hook needs no catalog
+     * lookup and a carrier being reworded cannot change what an app already
+     * sees. The number and the ICCID are drawn once and kept, because a SIM
+     * whose serial changes between two calls is worse than no spoof at all.
+     */
+
+    /** Key into CarrierCatalog; empty until a carrier is picked. */
+    val simCarrierId: String = "",
+    /** Both the network and the SIM country ISO, lowercase. */
+    val simCountryIso: String = "",
+    /** Both the network and the SIM operator alpha tag. */
+    val simOperatorName: String = "",
+    val phoneNumber: String = "",
+    /** ICCID. */
+    val simSerial: String = "",
 ) {
     /**
      * A position drawn uniformly from the disc of radius [offset] around the
@@ -83,6 +102,14 @@ data class Profile(
 
     /** Lower 8 bits of the ECI: which sector of that base station. */
     val sectorId: Int get() = eci and 0xFF
+
+    /**
+     * MCC and MNC glued together, which is what both getNetworkOperator and
+     * getSimOperator return. Empty when either half is unset, so an unconfigured
+     * profile reports nothing rather than a truncated operator.
+     */
+    val operatorNumeric: String
+        get() = if (mcc.isBlank() || mnc.isBlank()) "" else mcc.trim() + mnc.trim()
 
     companion object {
         const val DEFAULT_ID = "default"

@@ -3,7 +3,9 @@ package fuck.location.app.ui.config
 import android.content.Context
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.View
 import android.widget.EditText
+import android.widget.TextView
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.afollestad.materialdialogs.LayoutMode
 import com.afollestad.materialdialogs.MaterialDialog
@@ -13,6 +15,7 @@ import com.afollestad.materialdialogs.customview.getCustomView
 import com.afollestad.materialdialogs.input.input
 import com.afollestad.materialdialogs.list.listItems
 import fuck.location.R
+import fuck.location.app.ui.models.CarrierCatalog
 import fuck.location.app.ui.models.Profile
 import fuck.location.app.ui.models.ProfileStore
 import fuck.location.xposed.helpers.ConfigGateway
@@ -20,7 +23,7 @@ import java.text.NumberFormat
 import java.util.UUID
 
 /**
- * The dialogs behind the three feature entries and the profile library.
+ * The dialogs behind a profile's four spoofs and the profile library.
  *
  * Each editor reads the store fresh, edits one profile and writes the whole
  * store back, so the main screen and the profile list never work from a stale
@@ -149,6 +152,125 @@ object ProfileEditors {
         }
     }
 
+    /**
+     * The SIM identity, picked rather than typed.
+     *
+     * Everything an app can read about the operator follows from a country and
+     * a carrier, so those are the only two choices offered; the number and the
+     * ICCID are drawn to match and can then be edited by hand.
+     */
+    fun editSim(context: Context, profileId: String, onSaved: () -> Unit = {}) {
+        val store = ConfigGateway.get().readProfileStore()
+        val profile = store.profiles.firstOrNull { it.id == profileId } ?: return
+
+        val stored = CarrierCatalog.carrierOf(profile.simCarrierId)
+        var country = stored?.first
+            ?: CarrierCatalog.countryOf(profile.simCountryIso)
+            ?: CarrierCatalog.countries.first()
+        var carrier = stored?.second
+
+        MaterialDialog(context, BottomSheet(LayoutMode.WRAP_CONTENT)).show {
+            title(text = context.getString(R.string.dialog_sim_title, profile.displayName(context)))
+            customView(R.layout.dialog_sim, scrollable = true, horizontalPadding = true)
+
+            val view = getCustomView()
+            val countryRow = view.findViewById<TextView>(R.id.field_sim_country)
+            val carrierRow = view.findViewById<TextView>(R.id.field_sim_carrier)
+            val summary = view.findViewById<TextView>(R.id.sim_summary)
+            val number = view.findViewById<EditText>(R.id.field_phone_number)
+            val serial = view.findViewById<EditText>(R.id.field_sim_serial)
+
+            view.findViewById<SwitchMaterial>(R.id.switch_sim_enabled).isChecked = profile.simEnabled
+            number.setText(profile.phoneNumber)
+            serial.setText(profile.simSerial)
+
+            fun render() {
+                countryRow.text = country.label
+                carrierRow.text = carrier?.label ?: context.getString(R.string.sim_carrier_unset)
+                summary.text = carrier?.let {
+                    context.getString(
+                        R.string.sim_summary_format,
+                        country.iso,
+                        country.mcc + it.mnc,
+                        it.operatorName,
+                    )
+                } ?: context.getString(R.string.sim_summary_unset)
+            }
+
+            fun regenerate() {
+                val picked = carrier ?: return
+                val identity = CarrierCatalog.identityFor(country, picked)
+
+                number.setText(identity.phoneNumber)
+                serial.setText(identity.simSerial)
+            }
+
+            fun pickCarrier() {
+                MaterialDialog(context).show {
+                    title(R.string.sim_pick_carrier)
+                    listItems(items = country.carriers.map { it.label }) { _, index, _ ->
+                        val previous = carrier
+                        carrier = country.carriers[index]
+
+                        // Re-picking the same carrier leaves a hand-edited
+                        // number alone; changing carrier invalidates it, since
+                        // the range and the ICCID issuer both belong to the old
+                        // one.
+                        if (previous?.id != carrier?.id ||
+                            number.text.isBlank() || serial.text.isBlank()) regenerate()
+
+                        render()
+                    }
+                }
+            }
+
+            countryRow.setOnClickListener {
+                MaterialDialog(context).show {
+                    title(R.string.sim_pick_country)
+                    listItems(items = CarrierCatalog.countries.map { it.label }) { _, index, _ ->
+                        val picked = CarrierCatalog.countries[index]
+                        if (picked.iso != country.iso) {
+                            country = picked
+                            carrier = null
+                        }
+
+                        render()
+                        pickCarrier()
+                    }
+                }
+            }
+            carrierRow.setOnClickListener { pickCarrier() }
+            view.findViewById<View>(R.id.action_regenerate).setOnClickListener { regenerate() }
+
+            render()
+
+            positiveButton(R.string.action_save) { dialog ->
+                val fields = dialog.getCustomView()
+                val picked = carrier
+
+                ConfigGateway.get().writeProfileStore(
+                    store.replacing(
+                        profile.copy(
+                            simEnabled = fields.switched(R.id.switch_sim_enabled),
+                            simCarrierId = picked?.id ?: "",
+                            simCountryIso = if (picked != null) country.iso else "",
+                            simOperatorName = picked?.operatorName ?: "",
+                            phoneNumber = fields.text(R.id.field_phone_number),
+                            simSerial = fields.text(R.id.field_sim_serial),
+                            // The cell identity describes the same network, so
+                            // the carrier decides its MCC and MNC too rather
+                            // than letting the two drift apart.
+                            mcc = if (picked != null) country.mcc else profile.mcc,
+                            mnc = picked?.mnc ?: profile.mnc,
+                        )
+                    )
+                )
+                onSaved()
+            }
+            negativeButton(R.string.action_discard)
+        }
+    }
+
     // endregion
 
     // region profile library
@@ -188,6 +310,7 @@ object ProfileEditors {
                     locationEnabled = true,
                     cellEnabled = true,
                     wifiEnabled = true,
+                    simEnabled = true,
                 )
 
                 ConfigGateway.get().writeProfileStore(
@@ -216,6 +339,7 @@ object ProfileEditors {
             labelled(R.string.title_location_spoof, profile.locationEnabled),
             labelled(R.string.title_cell_spoof, profile.cellEnabled),
             labelled(R.string.title_wifi_spoof, profile.wifiEnabled),
+            labelled(R.string.title_sim_spoof, profile.simEnabled),
             context.getString(R.string.profile_action_default),
             context.getString(R.string.profile_action_rename),
             context.getString(R.string.profile_action_delete),
@@ -228,12 +352,13 @@ object ProfileEditors {
                     0 -> editLocation(context, profileId, onChanged)
                     1 -> editCell(context, profileId, onChanged)
                     2 -> editWifi(context, profileId, onChanged)
-                    3 -> {
+                    3 -> editSim(context, profileId, onChanged)
+                    4 -> {
                         ConfigGateway.get().writeProfileStore(store.copy(defaultProfileId = profileId))
                         onChanged()
                     }
-                    4 -> renameProfile(context, profileId, onChanged)
-                    5 -> deleteProfile(context, profileId, onChanged)
+                    5 -> renameProfile(context, profileId, onChanged)
+                    6 -> deleteProfile(context, profileId, onChanged)
                 }
             }
         }
@@ -385,16 +510,16 @@ object ProfileEditors {
     private fun Profile.displayName(context: Context): String =
         name.ifBlank { context.getString(R.string.profile_unnamed) }
 
-    private fun android.view.View.text(id: Int): String =
+    private fun View.text(id: Int): String =
         findViewById<EditText>(id).text.toString().trim()
 
-    private fun android.view.View.integer(id: Int, fallback: Int): Int =
+    private fun View.integer(id: Int, fallback: Int): Int =
         text(id).toIntOrNull() ?: fallback
 
-    private fun android.view.View.decimal(id: Int, fallback: Double): Double =
+    private fun View.decimal(id: Int, fallback: Double): Double =
         text(id).toDoubleOrNull() ?: fallback
 
-    private fun android.view.View.switched(id: Int): Boolean =
+    private fun View.switched(id: Int): Boolean =
         findViewById<SwitchMaterial>(id).isChecked
 
     // endregion

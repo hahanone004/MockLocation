@@ -10,6 +10,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.BuildConfig
 
 import fuck.location.xposed.cellar.PhoneInterfaceManagerHooker
+import fuck.location.xposed.cellar.SimIdentityHooker
 import fuck.location.xposed.cellar.TelephonyRegistryHooker
 import fuck.location.xposed.helpers.ConfigGateway
 import fuck.location.xposed.location.LocationHooker
@@ -74,6 +75,20 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
             "com.android.phone" -> {
                 step("phone interface manager") {
                     PhoneInterfaceManagerHooker().hookCellLocation(lpparam)
+                }
+                step("sim identity (phone)") {
+                    SimIdentityHooker().hookPhoneProcess(lpparam)
+                }
+            }
+
+            else -> {
+                // Everything else the module is scoped to is an ordinary app.
+                // Only the SIM identity needs hooking there, and only because
+                // TelephonyManager answers most of it without leaving the
+                // process. The hooks check the profile when they fire, so
+                // installing them costs an app nothing until it is configured.
+                step("sim identity") {
+                    SimIdentityHooker().hookTelephonyManager(lpparam)
                 }
             }
         }

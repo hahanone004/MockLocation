@@ -84,4 +84,17 @@ class ProfileTest {
         assertEquals(318610, profile.eNodeBId)
         assertEquals(260 and 0xFF, profile.sectorId)
     }
+
+    @Test
+    fun `the operator numeric is the MCC and the MNC together`() {
+        assertEquals("46692", Profile(mcc = "466", mnc = "92").operatorNumeric)
+        assertEquals("46601", Profile(mcc = "466", mnc = "01").operatorNumeric)
+    }
+
+    @Test
+    fun `a half-configured operator reports nothing rather than a truncated one`() {
+        assertEquals("", Profile(mcc = "466").operatorNumeric)
+        assertEquals("", Profile(mnc = "92").operatorNumeric)
+        assertEquals("", Profile().operatorNumeric)
+    }
 }

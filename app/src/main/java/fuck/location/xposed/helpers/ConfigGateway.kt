@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.ActivityManager
 import android.app.AndroidAppHelper
 import android.content.Context
+import android.os.SystemClock
 import fuck.location.xposed.helpers.reflect.*
 import com.squareup.moshi.JsonAdapter
 import com.squareup.moshi.JsonDataException
@@ -41,6 +42,17 @@ class ConfigGateway private constructor() {
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private lateinit var dataDir: String
     private lateinit var customContext: Context
+
+    /*
+     * Reading the config is a binder round trip, and the SIM hooks sit on calls
+     * an app is free to make in a tight loop, so the result is held for a
+     * moment. Nothing goes stale for long: the editor writes through this same
+     * object and refreshes the copy as it does, and a hook in another process
+     * picks a change up within the window.
+     */
+    private val cacheMillis = 2_000L
+    private var cachedStore: ProfileStore? = null
+    private var cachedAt = 0L
 
     /* For getting started in framework. In default, it judges whether a
      * packageName is in whiteList.json or not.
@@ -251,6 +263,10 @@ class ConfigGateway private constructor() {
         profileFor(packageName)?.takeIf { it.wifiEnabled }
 
     @ExperimentalStdlibApi
+    fun simSpoofFor(packageName: String): Profile? =
+        profileFor(packageName)?.takeIf { it.simEnabled }
+
+    @ExperimentalStdlibApi
     fun readPackageList(): List<String>? {
         val jsonAdapter: JsonAdapter<List<String>> = moshi.adapter()
         val json = try {
@@ -329,6 +345,9 @@ class ConfigGateway private constructor() {
 
     @ExperimentalStdlibApi
     fun readProfileStore(): ProfileStore {
+        val now = SystemClock.elapsedRealtime()
+        cachedStore?.let { if (now - cachedAt < cacheMillis) return it }
+
         val json = try {
             universalAPICaller("None", 4) as String
         } catch (e: Exception) {
@@ -336,7 +355,7 @@ class ConfigGateway private constructor() {
             EMPTY_CONFIG
         }
 
-        return try {
+        val store = try {
             parseProfileStore(json)
         } catch (e: Exception) {
             // A malformed config must not take the module down with it: report
@@ -344,6 +363,8 @@ class ConfigGateway private constructor() {
             Log.w("Config is unreadable, falling back to defaults: $e")
             ProfileStore()
         }
+
+        return store.also { remember(it, now) }
     }
 
     /**
@@ -376,6 +397,15 @@ class ConfigGateway private constructor() {
 
         val json: String = jsonAdapter.toJson(store)
         universalAPICaller(json, 3)
+
+        // What was just written is by definition current, so the editor never
+        // reads its own change back stale.
+        remember(store, SystemClock.elapsedRealtime())
+    }
+
+    private fun remember(store: ProfileStore, at: Long) {
+        cachedStore = store
+        cachedAt = at
     }
 
     fun setCustomContext(context: Context) {
