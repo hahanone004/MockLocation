@@ -5,8 +5,9 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@drawable/config_content_background"
     android:orientation="vertical"
-    android:paddingBottom="8dp">
+    android:padding="12dp">
 
     <com.google.android.material.card.MaterialCardView
         android:layout_width="match_parent"
