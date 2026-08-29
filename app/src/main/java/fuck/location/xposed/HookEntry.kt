@@ -20,7 +20,7 @@ import fuck.location.xposed.location.gnss.GnssHooker
 @ExperimentalStdlibApi
 class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
     override fun initZygote(startupParam: IXposedHookZygoteInit.StartupParam) {
-        XposedBridge.log("FL: in initZygote!")
+        Log.i("loaded, initZygote running")
 
         ConfigGateway.get().setDataPath()
     }
@@ -34,7 +34,8 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
         try {
             action()
         } catch (t: Throwable) {
-            XposedBridge.log("FL: hook step '$name' failed: $t")
+            // Both sinks: which step failed is the first thing anyone needs.
+            Log.e("hook step '$name' failed", t)
         }
     }
 
@@ -59,7 +60,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
 
             "android" -> {
                 Log.tag = "FuckLocation"
-                XposedBridge.log("FL: hooking system_server, API ${Build.VERSION.SDK_INT}")
+                Log.i("hooking system_server, API ${Build.VERSION.SDK_INT}")
 
                 step("config gateway (write)") { ConfigGateway.get().hookWillChangeBeEnabled(lpparam) }
                 step("config gateway (read)") { ConfigGateway.get().hookGetTagForIntentSender(lpparam) }

@@ -209,12 +209,20 @@ object Log {
     fun e(message: String, throwable: Throwable? = null) =
         write("E", message + (throwable?.let { " $it" } ?: ""))
 
+    /*
+     * Written to both sinks on purpose. XposedBridge's log is the one a module
+     * manager shows, but not every framework has a viewer for it - and when the
+     * question is "did this module load at all", the answer has to be reachable
+     * from plain logcat too (adb logcat -s FuckLocation).
+     */
     private fun write(level: String, message: String) {
         try {
             XposedBridge.log("$tag/$level: $message")
         } catch (t: Throwable) {
-            android.util.Log.d(tag, "$level: $message")
+            // No framework around: logcat is the only sink left.
         }
+
+        android.util.Log.i(tag, "$level: $message")
     }
 }
 
