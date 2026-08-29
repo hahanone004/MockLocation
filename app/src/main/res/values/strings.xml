@@ -79,6 +79,22 @@
 
     <string name="profile_label_default">%s (default)</string>
     <string name="profile_action_new">New profile</string>
+    <string name="profile_library_hint">Profiles keep location, network and identity data consistent across assigned apps.</string>
+    <string name="profile_assignment_hint">Choose which environment this app should see.</string>
+    <string name="profile_badge_default">Default</string>
+    <string name="profile_badge_selected">Selected</string>
+    <string name="profile_follow_default_detail">Automatically follows the current default profile</string>
+    <string name="profile_enabled_summary">%d of 4 spoof types enabled</string>
+    <string name="profile_state_on">On</string>
+    <string name="profile_state_off">Off</string>
+    <string name="profile_location_summary">%1$s, %2$s · jitter %3$s m</string>
+    <string name="profile_cell_summary">%1$s%2$s · ECI %3$d</string>
+    <string name="profile_wifi_summary">%d access point(s)</string>
+    <string name="profile_sim_summary">%1$s · %2$s</string>
+    <string name="profile_not_configured">Not configured yet</string>
+    <string name="profile_all_off">All spoof types are off</string>
+    <string name="profile_language_unchanged">system language unchanged</string>
+    <string name="action_close">Close</string>
     <string name="profile_action_default">Use as default</string>
     <string name="profile_action_rename">Rename</string>
     <string name="profile_action_delete">Delete</string>

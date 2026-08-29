@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="8dp">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        app:cardBackgroundColor="@color/brand_primary_container"
+        app:cardCornerRadius="18dp"
+        app:cardElevation="0dp">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="16dp">
+            <TextView
+                android:id="@+id/profile_enabled_summary"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/brand_on_primary_container"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                tools:text="已开启 4 类伪装中的 3 类" />
+            <TextView
+                android:id="@+id/profile_default_badge"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:background="@drawable/status_icon_background"
+                android:paddingStart="10dp"
+                android:paddingTop="5dp"
+                android:paddingEnd="10dp"
+                android:paddingBottom="5dp"
+                android:text="@string/profile_badge_default"
+                android:textColor="@color/brand_on_primary_container"
+                android:textSize="11sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+    </com.google.android.material.card.MaterialCardView>
+
+    <include
+        android:id="@+id/profile_action_location"
+        layout="@layout/profile_feature_item" />
+    <include
+        android:id="@+id/profile_action_cell"
+        layout="@layout/profile_feature_item" />
+    <include
+        android:id="@+id/profile_action_wifi"
+        layout="@layout/profile_feature_item" />
+    <include
+        android:id="@+id/profile_action_sim"
+        layout="@layout/profile_feature_item" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/profile_action_make_default"
+        style="@style/Widget.Material3.Button.TonalButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:minHeight="50dp"
+        android:text="@string/profile_action_default"
+        app:cornerRadius="16dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="end"
+        android:orientation="horizontal">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/profile_action_rename_button"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/profile_action_rename" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/profile_action_delete_button"
+            style="@style/Widget.Material3.Button.TextButton"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/profile_action_delete"
+            android:textColor="?attr/colorError" />
+    </LinearLayout>
+</LinearLayout>

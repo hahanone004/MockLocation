@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="8dp">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/profile_assignment_hint"
+        android:textColor="@color/app_on_surface_variant"
+        android:textSize="14sp" />
+
+    <TextView
+        android:id="@+id/profile_assignment_package"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:layout_marginBottom="16dp"
+        android:ellipsize="middle"
+        android:maxLines="1"
+        android:textColor="@color/brand_primary"
+        android:textSize="13sp" />
+
+    <LinearLayout
+        android:id="@+id/profile_assignment_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+</LinearLayout>

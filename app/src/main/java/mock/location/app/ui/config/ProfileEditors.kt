@@ -2,18 +2,24 @@ package mock.location.app.ui.config
 
 import android.app.Activity
 import android.content.Context
+import android.content.res.ColorStateList
 import android.content.pm.PackageManager
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.View
 import android.view.WindowManager
 import android.widget.EditText
+import android.widget.ImageView
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.widget.ImageViewCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import com.google.android.material.switchmaterial.SwitchMaterial
+import com.google.android.material.card.MaterialCardView
 import com.afollestad.materialdialogs.MaterialDialog
 import com.afollestad.materialdialogs.customview.customView
 import com.afollestad.materialdialogs.customview.getCustomView
@@ -384,26 +390,34 @@ object ProfileEditors {
     fun manageProfiles(context: Context, onChanged: () -> Unit = {}) {
         val store = ConfigGateway.get().readProfileStore()
 
-        val labels = store.profiles.map { profile ->
-            val name = if (profile.id == store.defaultProfileId) {
-                context.getString(R.string.profile_label_default, profile.displayName(context))
-            } else {
-                profile.displayName(context)
-            }
-
-            profile.qualified(context, name)
-        } + context.getString(R.string.profile_action_new)
-
         MaterialDialog(context).show {
             // Keep the library below the selected profile menu. Without this,
             // opening a profile consumes the list dialog and Back jumps all
             // the way to the activity's home screen.
             noAutoDismiss()
             title(R.string.title_profiles)
+            customView(R.layout.dialog_profile_library, scrollable = true, horizontalPadding = true)
             rebuildWhenStale(context) { manageProfiles(context, onChanged) }
-            listItems(items = labels) { _, index, _ ->
-                if (index == store.profiles.size) createProfile(context, changed(onChanged))
-                else profileActions(context, store.profiles[index].id, changed(onChanged))
+            negativeButton(R.string.action_close) { it.dismiss() }
+
+            val notify = changed(onChanged)
+            val view = getCustomView()
+            val container = view.findViewById<LinearLayout>(R.id.profile_list_container)
+
+            store.profiles.forEach { profile ->
+                addProfileRow(
+                    context = context,
+                    container = container,
+                    title = profile.displayName(context),
+                    summary = profile.featureSummary(context),
+                    badge = context.getString(R.string.profile_badge_default)
+                        .takeIf { profile.id == store.defaultProfileId },
+                    onClick = { profileActions(context, profile.id, notify) },
+                )
+            }
+
+            view.findViewById<View>(R.id.profile_action_new_button).setOnClickListener {
+                createProfile(context, notify)
             }
         }
     }
@@ -446,51 +460,107 @@ object ProfileEditors {
         val store = ConfigGateway.get().readProfileStore()
         val profile = store.profiles.firstOrNull { it.id == profileId } ?: return
 
-        // Showing the on/off state here saves opening all three to find out
-        // what a profile does.
-        fun labelled(titleRes: Int, enabled: Boolean) = context.getString(
-            if (enabled) R.string.profile_feature_on else R.string.profile_feature_off,
-            context.getString(titleRes),
-        )
-
-        val actions = listOf(
-            labelled(R.string.title_location_spoof, profile.locationEnabled),
-            labelled(R.string.title_cell_spoof, profile.cellEnabled),
-            labelled(R.string.title_wifi_spoof, profile.wifiEnabled),
-            labelled(R.string.title_sim_spoof, profile.simEnabled),
-            context.getString(R.string.profile_action_default),
-            context.getString(R.string.profile_action_rename),
-            context.getString(R.string.profile_action_delete),
-        )
-
         MaterialDialog(context).show {
             // Feature editors are a third navigation level. Preserve this
             // menu below them so Back returns here instead of to the home page.
             noAutoDismiss()
             title(text = profile.displayName(context))
+            customView(R.layout.dialog_profile_actions, scrollable = true, horizontalPadding = true)
+            negativeButton(R.string.action_close) { it.dismiss() }
             // The on/off suffixes above were read when this menu was built, so
             // returning from a feature editor that flipped one showed the old
             // answer until the whole menu was reopened.
             rebuildWhenStale(context) { profileActions(context, profileId, onChanged) }
             val notify = changed(onChanged)
-            listItems(items = actions) { dialog, index, _ ->
-                when (index) {
-                    0 -> editLocation(context, profileId, notify)
-                    1 -> editCell(context, profileId, notify)
-                    2 -> editWifi(context, profileId, notify)
-                    3 -> editSim(context, profileId, notify)
-                    4 -> {
-                        val current = ConfigGateway.get().readProfileStore()
-                        save(context, current.copy(defaultProfileId = profileId), notify)
-                    }
-                    5 -> renameProfile(context, profileId, notify)
-                    6 -> deleteProfile(context, profileId) {
-                        // The menu refers to an object that no longer exists.
-                        // Close just this level; the profile library remains
-                        // underneath and Back navigation stays coherent.
+            val dialog = this
+            val view = getCustomView()
+            val enabledCount = listOf(
+                profile.locationEnabled,
+                profile.cellEnabled,
+                profile.wifiEnabled,
+                profile.simEnabled,
+            ).count { it }
+
+            view.findViewById<TextView>(R.id.profile_enabled_summary).text =
+                context.getString(R.string.profile_enabled_summary, enabledCount)
+            view.findViewById<View>(R.id.profile_default_badge).visibility =
+                if (profile.id == store.defaultProfileId) View.VISIBLE else View.GONE
+
+            bindFeatureRow(
+                context,
+                view.findViewById(R.id.profile_action_location),
+                R.drawable.baseline_location_on_24,
+                R.string.title_location_spoof,
+                context.getString(
+                    R.string.profile_location_summary,
+                    CoordinateFormat.format(profile.x),
+                    CoordinateFormat.format(profile.y),
+                    CoordinateFormat.format(profile.offset),
+                ),
+                profile.locationEnabled,
+            ) { editLocation(context, profileId, notify) }
+
+            val cellSummary = if (profile.operatorNumeric.isBlank() || profile.eci <= 0) {
+                context.getString(R.string.profile_not_configured)
+            } else {
+                context.getString(R.string.profile_cell_summary, profile.mcc, profile.mnc, profile.eci)
+            }
+            bindFeatureRow(
+                context,
+                view.findViewById(R.id.profile_action_cell),
+                R.drawable.baseline_cell_tower_24,
+                R.string.title_cell_spoof,
+                cellSummary,
+                profile.cellEnabled,
+            ) { editCell(context, profileId, notify) }
+
+            bindFeatureRow(
+                context,
+                view.findViewById(R.id.profile_action_wifi),
+                R.drawable.baseline_wifi_24,
+                R.string.title_wifi_spoof,
+                context.getString(R.string.profile_wifi_summary, profile.wifiAccessPoints.size),
+                profile.wifiEnabled,
+            ) { editWifi(context, profileId, notify) }
+
+            val simSummary = if (profile.simOperatorName.isBlank()) {
+                context.getString(R.string.profile_not_configured)
+            } else {
+                context.getString(
+                    R.string.profile_sim_summary,
+                    profile.simOperatorName,
+                    profile.localeTag.takeIf { profile.localeEnabled }
+                        ?: context.getString(R.string.profile_language_unchanged),
+                )
+            }
+            bindFeatureRow(
+                context,
+                view.findViewById(R.id.profile_action_sim),
+                R.drawable.baseline_sim_card_24,
+                R.string.title_sim_spoof,
+                simSummary,
+                profile.simEnabled,
+            ) { editSim(context, profileId, notify) }
+
+            view.findViewById<View>(R.id.profile_action_make_default).apply {
+                visibility = if (profile.id == store.defaultProfileId) View.GONE else View.VISIBLE
+                setOnClickListener {
+                    val current = ConfigGateway.get().readProfileStore()
+                    save(context, current.copy(defaultProfileId = profileId)) {
                         dialog.dismiss()
                         notify()
+                        profileActions(context, profileId, onChanged)
                     }
+                }
+            }
+            view.findViewById<View>(R.id.profile_action_rename_button).setOnClickListener {
+                renameProfile(context, profileId, notify)
+            }
+            view.findViewById<View>(R.id.profile_action_delete_button).setOnClickListener {
+                deleteProfile(context, profileId) {
+                    // The detail view refers to an object that no longer exists.
+                    dialog.dismiss()
+                    notify()
                 }
             }
         }
@@ -570,27 +640,29 @@ object ProfileEditors {
         val store = ConfigGateway.get().readProfileStore()
         val default = store.defaultProfile()
 
-        val labels = listOf(
-            context.getString(
-                R.string.profile_assign_follow_default,
-                default?.displayName(context) ?: context.getString(R.string.profile_unnamed),
-            ).let { default?.qualified(context, it) ?: it },
-        ) + store.profiles.map { it.qualified(context, it.displayName(context)) }
-
         MaterialDialog(context).show {
             title(R.string.profile_assign_title)
-            listItems(items = labels) { _, index, _ ->
+            customView(R.layout.dialog_profile_assignment, scrollable = true, horizontalPadding = true)
+            negativeButton(R.string.action_close)
+
+            val dialog = this
+            val view = getCustomView()
+            val container = view.findViewById<LinearLayout>(R.id.profile_assignment_container)
+            val assignedId = store.assignments[packageName]
+            view.findViewById<TextView>(R.id.profile_assignment_package).text = packageName
+
+            fun select(selectedId: String?) {
                 val current = ConfigGateway.get().readProfileStore()
                 // Following the default is the absence of an assignment, so
                 // picking it drops the entry rather than storing a sentinel.
-                val selectedId = store.profiles.getOrNull(index - 1)?.id
-                val assignments = if (index == 0 || selectedId == null) {
+                val assignments = if (selectedId == null) {
                     current.assignments - packageName
                 } else {
                     current.assignments + (packageName to selectedId)
                 }
 
                 save(context, current.copy(assignments = assignments)) {
+                    dialog.dismiss()
                     onChanged()
                     val selected = selectedId?.let { id ->
                         current.profiles.firstOrNull { it.id == id }
@@ -599,6 +671,31 @@ object ProfileEditors {
                         offerPlayServices(context, selected, packageName, onChanged)
                     }
                 }
+            }
+
+            addProfileRow(
+                context = context,
+                container = container,
+                title = context.getString(
+                    R.string.profile_assign_follow_default,
+                    default?.displayName(context) ?: context.getString(R.string.profile_unnamed),
+                ),
+                summary = context.getString(R.string.profile_follow_default_detail),
+                selected = assignedId == null,
+                onClick = { select(null) },
+            )
+
+            store.profiles.forEach { profile ->
+                addProfileRow(
+                    context = context,
+                    container = container,
+                    title = profile.displayName(context),
+                    summary = profile.featureSummary(context),
+                    badge = context.getString(R.string.profile_badge_default)
+                        .takeIf { profile.id == store.defaultProfileId },
+                    selected = assignedId == profile.id,
+                    onClick = { select(profile.id) },
+                )
             }
         }
     }
@@ -681,6 +778,83 @@ object ProfileEditors {
         return store.profiles.firstOrNull { it.id == assigned }
             ?.let { it.qualified(context, it.displayName(context)) }
             ?: followDefault
+    }
+
+    private fun addProfileRow(
+        context: Context,
+        container: LinearLayout,
+        title: String,
+        summary: String,
+        badge: String? = null,
+        selected: Boolean = false,
+        onClick: () -> Unit,
+    ) {
+        val row = LayoutInflater.from(context)
+            .inflate(R.layout.profile_list_item, container, false)
+        val card = row.findViewById<MaterialCardView>(R.id.profile_item_card)
+        val badgeView = row.findViewById<TextView>(R.id.profile_item_badge)
+        val trailing = row.findViewById<ImageView>(R.id.profile_item_trailing)
+
+        row.findViewById<TextView>(R.id.profile_item_title).text = title
+        row.findViewById<TextView>(R.id.profile_item_summary).text = summary
+
+        val visibleBadge = badge ?: context.getString(R.string.profile_badge_selected)
+            .takeIf { selected }
+        badgeView.text = visibleBadge
+        badgeView.visibility = if (visibleBadge == null) View.GONE else View.VISIBLE
+
+        if (selected) {
+            card.strokeWidth = 2
+            card.strokeColor = context.getColor(R.color.brand_primary)
+            card.setCardBackgroundColor(context.getColor(R.color.brand_primary_container))
+            trailing.setImageResource(R.drawable.baseline_done_24)
+            ImageViewCompat.setImageTintList(
+                trailing,
+                ColorStateList.valueOf(context.getColor(R.color.brand_primary)),
+            )
+        } else {
+            trailing.setImageResource(R.drawable.baseline_chevron_right_24)
+        }
+
+        card.setOnClickListener { onClick() }
+        container.addView(row)
+    }
+
+    private fun bindFeatureRow(
+        context: Context,
+        row: View,
+        iconRes: Int,
+        titleRes: Int,
+        summary: String,
+        enabled: Boolean,
+        onClick: () -> Unit,
+    ) {
+        row.findViewById<ImageView>(R.id.profile_feature_icon).setImageResource(iconRes)
+        row.findViewById<TextView>(R.id.profile_feature_title).setText(titleRes)
+        row.findViewById<TextView>(R.id.profile_feature_summary).text = summary
+        row.findViewById<TextView>(R.id.profile_feature_state).apply {
+            setText(if (enabled) R.string.profile_state_on else R.string.profile_state_off)
+            setTextColor(context.getColor(
+                if (enabled) R.color.module_on_active_container else R.color.app_on_surface_variant
+            ))
+            setBackgroundResource(
+                if (enabled) R.drawable.profile_state_on_background
+                else R.drawable.profile_state_off_background
+            )
+        }
+        row.setOnClickListener { onClick() }
+    }
+
+    private fun Profile.featureSummary(context: Context): String {
+        val features = buildList {
+            if (locationEnabled) add(context.getString(R.string.title_location_spoof))
+            if (cellEnabled) add(context.getString(R.string.title_cell_spoof))
+            if (wifiEnabled) add(context.getString(R.string.title_wifi_spoof))
+            if (simEnabled) add(context.getString(R.string.title_sim_spoof))
+        }
+        return features.joinToString(" · ").ifBlank {
+            context.getString(R.string.profile_all_off)
+        }
     }
 
     // endregion
