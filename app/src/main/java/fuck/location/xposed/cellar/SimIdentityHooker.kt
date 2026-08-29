@@ -57,10 +57,8 @@ class SimIdentityHooker {
     @ExperimentalStdlibApi
     @SuppressLint("PrivateApi")
     fun hookPhoneProcess(lpparam: XC_LoadPackage.LoadPackageParam) {
-        substituteForCaller(lpparam, PHONE_SUB_INFO,
-            setOf("getLine1NumberForSubscriber")) { it.phoneNumber }
-        substituteForCaller(lpparam, PHONE_SUB_INFO,
-            setOf("getIccSerialNumberForSubscriber")) { it.simSerial }
+        substituteForCaller(lpparam, PHONE_SUB_INFO, PHONE_SUB_INFO_NUMBER) { it.phoneNumber }
+        substituteForCaller(lpparam, PHONE_SUB_INFO, PHONE_SUB_INFO_ICCID) { it.simSerial }
         substituteForCaller(lpparam, PHONE_INTERFACE_MANAGER,
             setOf("getLine1NumberForDisplay")) { it.phoneNumber }
     }
@@ -135,8 +133,24 @@ class SimIdentityHooker {
         const val TELEPHONY_MANAGER = "android.telephony.TelephonyManager"
         const val SUBSCRIPTION_MANAGER = "android.telephony.SubscriptionManager"
         const val SUBSCRIPTION_INFO = "android.telephony.SubscriptionInfo"
-        const val PHONE_SUB_INFO = "com.android.phone.PhoneSubInfoController"
+        /*
+         * Hosted by the phone process but declared in the telephony framework,
+         * not in the phone app: looking for it under com.android.phone found
+         * nothing, and the number and the ICCID went unspoofed for every app
+         * the module was not scoped to.
+         */
+        const val PHONE_SUB_INFO = "com.android.internal.telephony.PhoneSubInfoController"
         const val PHONE_INTERFACE_MANAGER = "com.android.phone.PhoneInterfaceManager"
+
+        // The plain and WithFeature forms delegate to the ForSubscriber ones,
+        // so hooking the delegate alone would do - but all three carry the
+        // calling package in the same place, and covering them costs nothing if
+        // that delegation ever changes.
+        val PHONE_SUB_INFO_NUMBER = setOf("getLine1Number", "getLine1NumberForSubscriber")
+        val PHONE_SUB_INFO_ICCID = setOf(
+            "getIccSerialNumber", "getIccSerialNumberWithFeature",
+            "getIccSerialNumberForSubscriber",
+        )
 
         /*
          * The network and the SIM halves of each pair are spoofed from one
