@@ -77,7 +77,10 @@ class WLANHooker {
                             return@after
                         }
 
-                    Log.i("[WiFi] wifi service started, hooking it")
+                    // No line of its own here: the apex starts several wifi
+                    // services that share this loader, so this runs once per
+                    // service while there is only one set of hooks to install.
+                    // tryHookWifiService says so exactly once, when it does it.
                     try {
                         tryHookWifiService(loader, "service start")
                     } catch (t: Throwable) {

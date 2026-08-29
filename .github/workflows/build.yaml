@@ -85,8 +85,21 @@ jobs:
       - name: Upload APK
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          apk=$(find app/build -type f -name '*.apk' | head -n 1)
-          test -n "$apk" || { echo 'No release APK produced'; find app/build/outputs -type f | head -50; exit 1; }
+          # assembleDebug ran first, so both APKs are under app/build and an
+          # unfiltered find can hand back the debug one - which would then be
+          # signed with the debug key and published as the release. Prefer the
+          # release output directory, and fall back to anything that is not a
+          # debug build rather than to anything at all.
+          apk=$(find app/build/outputs/apk/release -type f -name '*.apk' 2>/dev/null | head -n 1)
+          if [ -z "$apk" ]; then
+            apk=$(find app/build -type f -name '*.apk' ! -ipath '*debug*' | head -n 1)
+          fi
+          test -n "$apk" || {
+            echo 'No release APK produced; these are the APKs that exist:'
+            find app/build -type f -name '*.apk'
+            exit 1
+          }
+          echo "Publishing $apk"
           mkdir -p release
           cp "$apk" release/app-release.apk
 
