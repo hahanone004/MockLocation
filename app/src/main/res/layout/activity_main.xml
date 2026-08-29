@@ -1,149 +1,176 @@
 <?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout
+<!--
+    The toolbar belongs to the layout, not to the window decoration: as a decor
+    action bar it was drawn over the top of the content, so the status card sat
+    behind the "Fuck Location" title bar.
+-->
+<androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:fitsSystemWindows="true">
 
-    <com.google.android.material.card.MaterialCardView
-        android:id="@+id/module_status_card"
-        style="@style/DefaultCard">
+    <com.google.android.material.appbar.AppBarLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:fitsSystemWindows="true">
 
-        <LinearLayout
-            style="@style/Default"
-            android:orientation="horizontal">
+        <com.google.android.material.appbar.MaterialToolbar
+            android:id="@+id/toolbar"
+            android:layout_width="match_parent"
+            android:layout_height="?attr/actionBarSize"
+            android:theme="@style/ThemeOverlay.MaterialComponents.Dark.ActionBar"
+            app:popupTheme="@style/ThemeOverlay.MaterialComponents.Light" />
+    </com.google.android.material.appbar.AppBarLayout>
 
-            <ImageView
-                android:id="@+id/module_status_icon"
-                style="@style/DefaultImage" />
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
-            <!--
-                Weighted rather than match_parent: as match_parent it was as wide
-                as the whole card even though the icon sits beside it, so any
-                text long enough to wrap ran off the right edge.
-            -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/module_status_card"
+            style="@style/DefaultCard">
+
             <LinearLayout
                 style="@style/Default"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_marginEnd="16dp"
-                android:orientation="vertical"
-                android:paddingVertical="25dp">
+                android:orientation="horizontal">
 
-                <TextView
-                    android:id="@+id/module_status_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textColor="@android:color/white"
-                    android:textSize="18sp"
-                    android:textStyle="bold" />
+                <ImageView
+                    android:id="@+id/module_status_icon"
+                    style="@style/DefaultImage" />
 
-                <TextView
-                    android:id="@+id/service_status_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textAppearance="?attr/textAppearanceBody2"
-                    android:textColor="@android:color/white" />
+                <!--
+                    Weighted rather than match_parent: as match_parent it was as wide
+                    as the whole card even though the icon sits beside it, so any
+                    text long enough to wrap ran off the right edge.
+                -->
+                <LinearLayout
+                    style="@style/Default"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="16dp"
+                    android:orientation="vertical"
+                    android:paddingVertical="25dp">
 
-                <TextView
-                    android:id="@+id/extension_status_text"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:textAppearance="?attr/textAppearanceBody2"
-                    android:textColor="@android:color/white"
-                    android:visibility="gone" />
+                    <TextView
+                        android:id="@+id/module_status_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@android:color/white"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
 
-                <TextView
-                    android:id="@+id/serve_times"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:textColor="@android:color/white"
-                    android:textSize="12sp" />
+                    <TextView
+                        android:id="@+id/service_status_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textAppearance="?attr/textAppearanceBody2"
+                        android:textColor="@android:color/white" />
+
+                    <TextView
+                        android:id="@+id/extension_status_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:textAppearance="?attr/textAppearanceBody2"
+                        android:textColor="@android:color/white"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/serve_times"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textColor="@android:color/white"
+                        android:textSize="12sp" />
+                </LinearLayout>
             </LinearLayout>
-        </LinearLayout>
 
-    </com.google.android.material.card.MaterialCardView>
+        </com.google.android.material.card.MaterialCardView>
 
-    <ScrollView
-        android:id="@+id/menu_scroll_bar"
-        style="@style/Default"
-        android:layout_below="@id/module_status_card"
-        android:fillViewport="true"
-        android:scrollbars="none">
-
-        <LinearLayout
+        <ScrollView
+            android:id="@+id/menu_scroll_bar"
             style="@style/Default"
-            android:orientation="vertical">
+            android:layout_below="@id/module_status_card"
+            android:clipToPadding="false"
+            android:fillViewport="true"
+            android:paddingBottom="8dp"
+            android:scrollbars="none">
 
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/menu_location_credit"
-                style="@style/DefaultCard"
-                app:cardElevation="0dp">
+            <LinearLayout
+                style="@style/Default"
+                android:orientation="vertical">
 
-                <LinearLayout
-                    style="@style/Default"
-                    android:orientation="horizontal">
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/menu_location_credit"
+                    style="@style/DefaultCard"
+                    app:cardElevation="0dp">
 
-                    <ImageView
-                        style="@style/DefaultImage"
-                        android:src="@drawable/baseline_credit_score_24" />
+                    <LinearLayout
+                        style="@style/Default"
+                        android:orientation="horizontal">
 
-                    <TextView
-                        style="@style/DefaultText.Option.Card"
-                        android:layout_width="wrap_content"
-                        android:gravity="center_vertical"
-                        android:text="@string/title_fucklocation_credit" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+                        <ImageView
+                            style="@style/DefaultImage"
+                            android:src="@drawable/baseline_credit_score_24" />
 
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/menu_profiles"
-                style="@style/DefaultCard"
-                app:cardElevation="0dp">
+                        <TextView
+                            style="@style/DefaultText.Option.Card"
+                            android:layout_width="wrap_content"
+                            android:gravity="center_vertical"
+                            android:text="@string/title_fucklocation_credit" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
-                <LinearLayout
-                    style="@style/Default"
-                    android:orientation="horizontal">
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/menu_profiles"
+                    style="@style/DefaultCard"
+                    app:cardElevation="0dp">
 
-                    <ImageView
-                        style="@style/DefaultImage"
-                        android:src="@drawable/baseline_layers_24" />
+                    <LinearLayout
+                        style="@style/Default"
+                        android:orientation="horizontal">
 
-                    <TextView
-                        style="@style/DefaultText.Option.Card"
-                        android:layout_width="wrap_content"
-                        android:gravity="center_vertical"
-                        android:text="@string/title_profiles" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
+                        <ImageView
+                            style="@style/DefaultImage"
+                            android:src="@drawable/baseline_layers_24" />
+
+                        <TextView
+                            style="@style/DefaultText.Option.Card"
+                            android:layout_width="wrap_content"
+                            android:gravity="center_vertical"
+                            android:text="@string/title_profiles" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
 
 
 
 
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/menu_about"
-                style="@style/DefaultCard"
-                app:cardElevation="0dp">
+                <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/menu_about"
+                    style="@style/DefaultCard"
+                    app:cardElevation="0dp">
 
-                <LinearLayout
-                    style="@style/Default"
-                    android:orientation="horizontal">
+                    <LinearLayout
+                        style="@style/Default"
+                        android:orientation="horizontal">
 
-                    <ImageView
-                        style="@style/DefaultImage"
-                        android:src="@drawable/baseline_info_24" />
+                        <ImageView
+                            style="@style/DefaultImage"
+                            android:src="@drawable/baseline_info_24" />
 
-                    <TextView
-                        style="@style/DefaultText.Option.Card"
-                        android:layout_width="wrap_content"
-                        android:gravity="center_vertical"
-                        android:text="@string/title_fucklocation_about" />
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-        </LinearLayout>
-    </ScrollView>
-
-</RelativeLayout>
+                        <TextView
+                            style="@style/DefaultText.Option.Card"
+                            android:layout_width="wrap_content"
+                            android:gravity="center_vertical"
+                            android:text="@string/title_fucklocation_about" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+            </LinearLayout>
+        </ScrollView>
+    </RelativeLayout>
+</androidx.coordinatorlayout.widget.CoordinatorLayout>

@@ -5,8 +5,12 @@ import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.view.View
+import android.widget.ScrollView
 import androidx.annotation.Keep
 import androidx.appcompat.content.res.AppCompatResources
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import fuck.location.R
 import fuck.location.app.ui.config.ProfileEditors
 import fuck.location.databinding.ActivityMainBinding
@@ -23,13 +27,29 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         ConfigGateway.get().migrateWhitelistIfNeeded(this)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        setSupportActionBar(binding.toolbar)
+
         setModuleState(binding)
+        keepMenuOffTheNavigationBar(binding.menuScrollBar)
 
         binding.menuLocationCredit.setOnClickListener(this)
         binding.menuProfiles.setOnClickListener(this)
         binding.menuAbout.setOnClickListener(this)
+    }
 
-        setContentView(binding.root)
+    /**
+     * The window runs edge to edge, so the last menu entry ends up under the
+     * gesture bar unless the bottom inset is padded in.
+     */
+    private fun keepMenuOffTheNavigationBar(menu: ScrollView) {
+        val base = menu.paddingBottom
+
+        ViewCompat.setOnApplyWindowInsetsListener(menu) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(bottom = base + bars.bottom)
+            insets
+        }
     }
 
     @SuppressLint("CheckResult")
