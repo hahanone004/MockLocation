@@ -391,6 +391,10 @@ object ProfileEditors {
         } + context.getString(R.string.profile_action_new)
 
         MaterialDialog(context).show {
+            // Keep the library below the selected profile menu. Without this,
+            // opening a profile consumes the list dialog and Back jumps all
+            // the way to the activity's home screen.
+            noAutoDismiss()
             title(R.string.title_profiles)
             listItems(items = labels) { _, index, _ ->
                 if (index == store.profiles.size) createProfile(context, onChanged)
@@ -455,8 +459,11 @@ object ProfileEditors {
         )
 
         MaterialDialog(context).show {
+            // Feature editors are a third navigation level. Preserve this
+            // menu below them so Back returns here instead of to the home page.
+            noAutoDismiss()
             title(text = profile.displayName(context))
-            listItems(items = actions) { _, index, _ ->
+            listItems(items = actions) { dialog, index, _ ->
                 when (index) {
                     0 -> editLocation(context, profileId, onChanged)
                     1 -> editCell(context, profileId, onChanged)
@@ -467,7 +474,13 @@ object ProfileEditors {
                         save(context, current.copy(defaultProfileId = profileId), onChanged)
                     }
                     5 -> renameProfile(context, profileId, onChanged)
-                    6 -> deleteProfile(context, profileId, onChanged)
+                    6 -> deleteProfile(context, profileId) {
+                        // The menu refers to an object that no longer exists.
+                        // Close just this level; the profile library remains
+                        // underneath and Back navigation stays coherent.
+                        dialog.dismiss()
+                        onChanged()
+                    }
                 }
             }
         }
