@@ -53,6 +53,12 @@ class LocationHooker {
     fun hookDLC(classLoader: ClassLoader) {
         val clazz = classLoader.loadClass("com.android.server.location.LocationManagerService")
 
+        Log.i(
+            "[Location] DLC class loader=${clazz.classLoader} " +
+                "declared=${clazz.declaredMethods.size} nested=" +
+                clazz.declaredClasses.joinToString { it.name }
+        )
+
         val methods = findAllMethods(clazz, findSuper = true) {
             name == "getLastLocation" && isPublic
         }
@@ -117,7 +123,9 @@ class LocationHooker {
             "com.android.server.location.geofence.GeofenceState",
             "com.android.server.location.GeofenceState",
         ).mapNotNull { className ->
-            runCatching { classLoader.loadClass(className) }.getOrNull()
+            runCatching { classLoader.loadClass(className) }
+                .onFailure { Log.d("[Location] geofence candidate unavailable: $className (${it.javaClass.simpleName})") }
+                .getOrNull()
         }
             .firstOrNull()
             ?: throw ClassNotFoundException("GeofenceState")

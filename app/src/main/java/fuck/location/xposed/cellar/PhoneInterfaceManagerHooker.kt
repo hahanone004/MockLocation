@@ -31,7 +31,18 @@ class PhoneInterfaceManagerHooker {
         val clazz: Class<*> =
             lpparam.classLoader.loadClass("com.android.phone.PhoneInterfaceManager")
 
-        Log.i("[Cellar] Finding method in PhoneInterfaceManager")
+        Log.i(
+            "[Cellar] Finding method in PhoneInterfaceManager loader=${clazz.classLoader} " +
+                "declared=${clazz.declaredMethods.size}"
+        )
+        Log.d(
+            "[Cellar] PhoneInterfaceManager candidates=" +
+                clazz.methods.asSequence()
+                    .map { it.name }
+                    .filter { it.contains("Imei", true) || it.contains("Meid", true) ||
+                        it.contains("CellInfo", true) || it.contains("CellLocation", true) }
+                    .distinct().sorted().joinToString()
+        )
 
         matchedMethods(clazz, "getImeiForSlot") {
             name == "getImeiForSlot" && isPublic

@@ -35,6 +35,11 @@ class WLANHooker {
         val loadWatchers = findAllMethods(clazz, findSuper = true) {
             name == "loadClassFromLoader" && isPrivate && isStatic
         }
+        Log.i(
+            "[WiFi] SystemServiceManager loader=${clazz.classLoader} " +
+                "loadWatchers=${loadWatchers.map { it.toGenericString() }} " +
+                "serviceLoader=$serviceLoader"
+        )
         if (loadWatchers.isEmpty() && serviceLoader == null) {
             throw NoSuchMethodException("loadClassFromLoader in ${clazz.name}")
         }

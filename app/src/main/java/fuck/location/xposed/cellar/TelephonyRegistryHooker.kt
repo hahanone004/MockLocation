@@ -24,6 +24,11 @@ class TelephonyRegistryHooker {
         val clazz: Class<*> =
             classLoader.loadClass("com.android.server.TelephonyRegistry")
 
+        Log.i(
+            "[Cellar] TelephonyRegistry loader=${clazz.classLoader} " +
+                "declared=${clazz.declaredMethods.size} inherited=${clazz.methods.size}"
+        )
+
         val validationMethods = findAllMethods(clazz, findSuper = true) {
             name == "validateEventAndUserLocked" && isPrivate
         }
@@ -50,6 +55,11 @@ class TelephonyRegistryHooker {
             name == "notifyCellInfoForSubscriber" || name == "notifyCellLocationForSubscriber" ||
                 name == "notifyDisplayInfoChanged"
         }
+        Log.i(
+            "[Cellar] TelephonyRegistry surface validation=${validationMethods.map { it.toGenericString() }} " +
+                "notifications=${notificationMethods.map { it.toGenericString() }} " +
+                "callbacks=location:${locationCallbacks.size},info:${infoCallbacks.size},display:${displayCallbacks.size}"
+        )
         if (validationMethods.isEmpty() || notificationMethods.isEmpty() ||
             locationCallbacks.isEmpty() || infoCallbacks.isEmpty()) {
             throw NoSuchMethodException(
