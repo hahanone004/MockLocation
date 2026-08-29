@@ -27,6 +27,16 @@ class LocationHooker {
         private val armedRegistrationClasses = ConcurrentHashMap.newKeySet<Class<*>>()
         /** Service/geofence methods, so a failed sibling step can be retried safely. */
         private val hookedServiceMethods = ConcurrentHashMap.newKeySet<Method>()
+
+        /**
+         * Where the per-geofence location check lives, newest first. Android 12
+         * folded GeofenceState into GeofenceManager's own registration class.
+         */
+        private val GEOFENCE_HOLDERS = listOf(
+            "com.android.server.location.geofence.GeofenceManager\$GeofenceRegistration",
+            "com.android.server.location.geofence.GeofenceState",
+            "com.android.server.location.GeofenceState",
+        )
     }
 
     @SuppressLint("PrivateApi")
@@ -114,43 +124,56 @@ class LocationHooker {
             }
         }
 
-        hookGeofences(classLoader)
     }
 
+    /**
+     * The location a geofence is evaluated against.
+     *
+     * Where this lives moved. Up to Android 11 it was GeofenceState, the owning
+     * package sat on it as a plain String, and the location arrived through
+     * processLocation. It is now GeofenceManager's inner GeofenceRegistration,
+     * the owner is a CallerIdentity, and the method is onLocationChanged - so on
+     * LineageOS 23 the old lookup found no class at all and took the rest of the
+     * location step down with it. Both shapes are accepted: the class by name,
+     * the owner by whichever field is actually present.
+     */
     @ExperimentalStdlibApi
-    private fun hookGeofences(classLoader: ClassLoader) {
-        val state = sequenceOf(
-            "com.android.server.location.geofence.GeofenceState",
-            "com.android.server.location.GeofenceState",
-        ).mapNotNull { className ->
+    fun hookGeofences(classLoader: ClassLoader) {
+        val state = GEOFENCE_HOLDERS.firstNotNullOfOrNull { className ->
             runCatching { classLoader.loadClass(className) }
-                .onFailure { Log.d("[Location] geofence candidate unavailable: $className (${it.javaClass.simpleName})") }
+                .onFailure {
+                    Log.d("[Location] geofence candidate unavailable: $className " +
+                        "(${it.javaClass.simpleName})")
+                }
                 .getOrNull()
-        }
-            .firstOrNull()
-            ?: throw ClassNotFoundException("GeofenceState")
-        // Resolve this once while installing. A renamed ROM field must make the
-        // hook step visibly fail instead of silently leaking real coordinates
-        // from every callback.
-        val packageNameField = findField(state, true) {
-            name == "mPackageName" || name == "packageName"
-        }
+        } ?: throw ClassNotFoundException("no geofence holder among $GEOFENCE_HOLDERS")
+
+        // Resolved once while installing. A renamed ROM field has to make the
+        // hook step visibly fail rather than silently leak real coordinates out
+        // of every callback.
+        val owner = geofenceOwnerField(state)
         val methods = findAllMethods(state, findSuper = true) {
-            name == "processLocation" && parameterCount == 1 &&
-                Location::class.java.isAssignableFrom(parameterTypes[0])
+            (name == "onLocationChanged" || name == "processLocation") &&
+                parameterCount == 1 && Location::class.java.isAssignableFrom(parameterTypes[0])
         }
-        if (methods.isEmpty()) throw NoSuchMethodException("processLocation in ${state.name}")
+        if (methods.isEmpty()) {
+            throw NoSuchMethodException("onLocationChanged/processLocation in ${state.name}")
+        }
+        Log.i("[Location] geofences hooked on ${state.name}.${methods.first().name}" +
+            " owner=${owner.name}")
+
         installServiceHooks(methods) { method -> method.hookBefore { param ->
                 val packageName = try {
-                    packageNameField.get(param.thisObject) as String
+                    owner.get(param.thisObject)?.let(::ownerPackageName)
                 } catch (t: Throwable) {
                     // A hook must not alter apps that have not positively
                     // matched a profile. Suppressing an unknown owner's update
-                    // disables geofencing globally on ROMs with a different
-                    // owner representation.
+                    // would disable geofencing globally on a ROM whose owner
+                    // representation is different again.
                     Log.w("geofence owner lookup failed; leaving update alone: $t")
                     return@hookBefore
-                }
+                } ?: return@hookBefore
+
                 val profile = ConfigGateway.get().locationSpoofFor(packageName)
                     ?: return@hookBefore
                 val original = param.args[0] as? Location ?: return@hookBefore
@@ -165,6 +188,17 @@ class LocationHooker {
                     clearInconsistentMotionFields(this)
                 }
         } }
+    }
+
+    /** The package name, whether the owner is a String or a CallerIdentity. */
+    private fun ownerPackageName(owner: Any): String? =
+        if (owner is String) owner.takeIf { it.isNotBlank() }
+        else ConfigGateway.get().callerIdentityToPackageName(owner)
+
+    private fun geofenceOwnerField(state: Class<*>): Field = runCatching {
+        findField(state, true) { name == "mPackageName" || name == "packageName" }
+    }.getOrElse {
+        findField(state, true) { name == "mIdentity" || name == "identity" }
     }
 
     private fun installServiceHooks(methods: List<Method>, install: (Method) -> Unit) {

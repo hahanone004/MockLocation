@@ -177,6 +177,13 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 installSystemStep("location DLC") {
                     LocationHooker().hookDLC(classLoader)
                 },
+                // Its own step: geofencing lives in a class that has moved
+                // between releases, and losing it used to fail getLastLocation's
+                // step too - which had already installed - so the retry loop ran
+                // to exhaustion reporting a failure that was half untrue.
+                installSystemStep("geofences") {
+                    LocationHooker().hookGeofences(classLoader)
+                },
                 installSystemStep("gnss") { GnssHooker().hookGnssCallbacks(classLoader) },
                 installSystemStep("wifi") { WLANHooker().hookWifiManager(classLoader) },
             ).all { it }

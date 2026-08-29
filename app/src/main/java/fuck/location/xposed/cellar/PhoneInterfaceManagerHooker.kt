@@ -132,8 +132,17 @@ class PhoneInterfaceManagerHooker {
             }
         }
 
+        // Not isPublic: this is the private choke point both public entry
+        // points delegate to, so requiring public matched nothing and every
+        // asynchronous cell-info request went on returning real modem data.
+        // The public pair is the fallback for a build without the internal one;
+        // hooking both would queue two pending updates for one request.
         matchedMethods(clazz, "requestCellInfoUpdateInternal") {
-            name == "requestCellInfoUpdateInternal" && isPublic
+            name == "requestCellInfoUpdateInternal"
+        }.ifEmpty {
+            matchedMethods(clazz, "requestCellInfoUpdate") {
+                name == "requestCellInfoUpdate" || name == "requestCellInfoUpdateWithWorkSource"
+            }
         }.hookMethod {
             before { param ->
                 val (packageName, profile) = spoofedCellProfile(param) ?: return@before
