@@ -1,6 +1,7 @@
 package fuck.location.app.ui.config
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
@@ -33,6 +34,8 @@ import java.util.UUID
  */
 @ExperimentalStdlibApi
 object ProfileEditors {
+
+    private const val PLAY_SERVICES = "com.google.android.gms"
 
     /** Enough decimals that a coordinate survives a round trip through the UI. */
     private val plainNumber: NumberFormat = NumberFormat.getNumberInstance().apply {
@@ -465,8 +468,59 @@ object ProfileEditors {
 
                 ConfigGateway.get().writeProfileStore(store.copy(assignments = assignments))
                 onChanged()
+
+                if (index > 0) {
+                    offerPlayServices(context, store.profiles[index - 1], packageName, onChanged)
+                }
             }
         }
+    }
+
+    /**
+     * Offers to put Play Services on the same profile.
+     *
+     * Which app is being spoofed is decided by which app asked, and most apps
+     * never ask: they hand the question to Google Play Services, and all the
+     * system ever sees is Play Services asking. Assigning such an app on its
+     * own therefore does nothing at all, with no way to tell from the outside -
+     * the profile is right, the assignment is right, and the position never
+     * changes. Only worth raising for a profile that actually spoofs location,
+     * and worth saying plainly that it is not confined to the one app.
+     */
+    private fun offerPlayServices(
+        context: Context,
+        profile: Profile,
+        justAssigned: String,
+        onChanged: () -> Unit,
+    ) {
+        if (!profile.locationEnabled || justAssigned == PLAY_SERVICES) return
+
+        val store = ConfigGateway.get().readProfileStore()
+        if (store.assignments[PLAY_SERVICES] == profile.id) return
+        if (!isInstalled(context, PLAY_SERVICES)) return
+
+        MaterialDialog(context).show {
+            title(R.string.play_services_title)
+            message(R.string.play_services_message)
+            positiveButton(R.string.play_services_assign) {
+                val current = ConfigGateway.get().readProfileStore()
+
+                ConfigGateway.get().writeProfileStore(
+                    current.copy(
+                        assignments = current.assignments + (PLAY_SERVICES to profile.id)
+                    )
+                )
+                onChanged()
+            }
+            negativeButton(R.string.action_not_now)
+        }
+    }
+
+    private fun isInstalled(context: Context, packageName: String): Boolean = try {
+        context.packageManager.getPackageInfo(packageName, 0)
+        true
+    } catch (e: PackageManager.NameNotFoundException) {
+        false
     }
 
     /** How an app's assignment reads in the app list. */

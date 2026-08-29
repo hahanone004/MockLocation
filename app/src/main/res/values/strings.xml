@@ -15,6 +15,7 @@
     <string name="action_save">Save</string>
     <string name="action_discard">Discard</string>
     <string name="action_ok">OK</string>
+    <string name="action_not_now">Not now</string>
 
     <string name="dialog_location_title">Location \u2014 %s</string>
     <string name="dialog_cell_title">Cell tower \u2014 %s</string>
@@ -76,6 +77,9 @@
     <string name="profile_default_name">Default</string>
     <string name="profile_migrated_name">Migrated settings</string>
     <string name="profile_assign_title">Profile for this app</string>
+    <string name="play_services_title">Apps that ask Play Services</string>
+    <string name="play_services_message">Most apps never ask the system where they are - they ask Google Play Services, and all the system ever sees is Play Services asking. An app like that sees nothing new until Play Services is on the same profile.\n\nThat covers every app which gets its location that way, not only this one.</string>
+    <string name="play_services_assign">Assign Play Services too</string>
     <string name="profile_does_nothing">%s \u00b7 spoofs nothing</string>
 
     <string name="card_title_not_activated">Not activated</string>

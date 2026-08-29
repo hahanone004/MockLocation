@@ -14,6 +14,7 @@
     <string name="action_save">保存</string>
     <string name="action_discard">不保存</string>
     <string name="action_ok">知道了</string>
+    <string name="action_not_now">先不用</string>
 
     <string name="dialog_location_title">位置伪装 \u2014 %s</string>
     <string name="dialog_cell_title">基站伪装 \u2014 %s</string>
@@ -67,6 +68,9 @@
     <string name="profile_default_name">默认</string>
     <string name="profile_migrated_name">迁移的设置</string>
     <string name="profile_assign_title">为该应用选择配置</string>
+    <string name="play_services_title">走 Play 服务定位的应用</string>
+    <string name="play_services_message">多数应用不会自己向系统要位置，而是问 Google Play 服务，系统看到的调用方永远是 Play 服务。这类应用只指派它自己是不会有任何变化的，得把 Play 服务也放到同一个配置里。\n\n注意这对所有走这条路取位置的应用都生效，不只是刚才那一个。</string>
+    <string name="play_services_assign">把 Play 服务也指派过去</string>
     <string name="profile_does_nothing">%s \u00b7 未开启伪装</string>
 
     <string name="card_title_not_activated">模块未激活</string>
