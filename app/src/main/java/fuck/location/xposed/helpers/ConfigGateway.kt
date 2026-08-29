@@ -494,6 +494,15 @@ class ConfigGateway private constructor() {
 
     fun setCustomContext(context: Context) {
         customContext = context
+
+        // A hook can be installed before Application.attach, when
+        // AndroidAppHelper.currentApplication() is still null.  A read made in
+        // that window falls back to the empty store and used to keep that
+        // answer cached even after a usable Context arrived.  Callers which
+        // deliberately hand us a Context are crossing that lifecycle boundary,
+        // so make the next read go back to system_server.
+        cachedStore = null
+        cachedAt = 0L
     }
 
     // For converting CallerIdentity to packageName

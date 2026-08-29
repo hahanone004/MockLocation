@@ -1,6 +1,7 @@
 package fuck.location.xposed.system
 
 import android.annotation.SuppressLint
+import android.content.Context
 import android.content.res.Configuration
 import android.os.LocaleList
 import de.robv.android.xposed.callbacks.XC_LoadPackage
@@ -8,9 +9,11 @@ import fuck.location.xposed.helpers.ConfigGateway
 import fuck.location.xposed.helpers.reflect.Log
 import fuck.location.xposed.helpers.reflect.findAllMethods
 import fuck.location.xposed.helpers.reflect.findMethod
+import fuck.location.xposed.helpers.reflect.hookAfter
 import fuck.location.xposed.helpers.reflect.hookBefore
 import fuck.location.xposed.helpers.reflect.isStatic
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * The system language, as the app sees it.
@@ -38,6 +41,8 @@ class LocaleHooker {
         val packageName = lpparam.packageName
         val localeListClass = lpparam.classLoader.loadClass("android.os.LocaleList")
         val resourcesClass = lpparam.classLoader.loadClass("android.content.res.Resources")
+        val applicationClass = lpparam.classLoader.loadClass("android.app.Application")
+        val installed = AtomicBoolean(false)
 
         findAllMethods(localeListClass) {
             name == "setDefault" && isStatic
@@ -62,18 +67,50 @@ class LocaleHooker {
             param.args[0] = Configuration(original).apply { setLocales(spoofed) }
         }
 
-        // The process may already have been told its locale before this ran, in
-        // which case there is no upcoming setDefault to intercept.
-        localeListFor(packageName)?.let { spoofed ->
-            try {
-                findMethod(localeListClass) {
-                    name == "setDefault" && parameterCount == 1
-                }.invoke(null, spoofed)
+        /*
+         * Vector can dispatch handleLoadPackage before ActivityThread has made
+         * the Application.  Reading the profile there has no Context with
+         * which to make the binder call, so the old eager installation saw the
+         * empty fallback and permanently missed the process' locale setup.
+         * Application.attach is the first point with a guaranteed Context.
+         * Apply both halves there: the Java default and the Resources
+         * configuration which chooses the translations rendered by the app.
+         */
+        findAllMethods(applicationClass) {
+            name == "attach" && parameterCount == 1 &&
+                parameterTypes[0] == Context::class.java
+        }.hookAfter { param ->
+            if (!installed.compareAndSet(false, true)) return@hookAfter
 
-                Log.i("system language for $packageName reported as ${spoofed[0].toLanguageTag()}")
-            } catch (t: Throwable) {
-                Log.e("could not install the default locale for $packageName", t)
+            val context = param.args[0] as? Context ?: return@hookAfter
+            ConfigGateway.get().setCustomContext(context)
+            installLocale(packageName, context, localeListClass)
+        }
+    }
+
+    @ExperimentalStdlibApi
+    @Suppress("DEPRECATION")
+    private fun installLocale(
+        packageName: String,
+        context: Context,
+        localeListClass: Class<*>,
+    ) {
+        val spoofed = localeListFor(packageName) ?: return
+
+        try {
+            findMethod(localeListClass) {
+                name == "setDefault" && parameterCount == 1
+            }.invoke(null, spoofed)
+
+            val resources = context.resources
+            val configuration = Configuration(resources.configuration).apply {
+                setLocales(spoofed)
             }
+            resources.updateConfiguration(configuration, resources.displayMetrics)
+
+            Log.i("system language for $packageName reported as ${spoofed[0].toLanguageTag()}")
+        } catch (t: Throwable) {
+            Log.e("could not install the default locale for $packageName", t)
         }
     }
 
