@@ -198,7 +198,10 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
 
     private fun scheduleSystemServerRetry(classLoader: ClassLoader) {
         if (systemServerRetryCount.get() >= MAX_SYSTEM_SERVER_RETRIES) {
-            Log.e("system_server hooks remain incomplete after $MAX_SYSTEM_SERVER_RETRIES retries")
+            Log.e(
+                "giving up after $MAX_SYSTEM_SERVER_RETRIES retries; still not installed: " +
+                    outstandingSystemSteps.sorted().joinToString()
+            )
             return
         }
         if (!systemServerRetryScheduled.compareAndSet(false, true)) return
@@ -215,14 +218,25 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
         }
     }
 
+    /**
+     * A step is only really lost once the retries are spent.
+     *
+     * Some of these cannot succeed on the first pass by construction - the
+     * Wi-Fi service starts a few seconds after the module installs its hooks -
+     * so a failure here is usually just "not yet". Logging every attempt at
+     * error level made an ordinary boot look broken; the give-up in
+     * [scheduleSystemServerRetry] is the line that means something.
+     */
     private inline fun installSystemStep(name: String, action: () -> Unit): Boolean {
         if (installedSystemSteps.contains(name)) return true
         return try {
             action()
             installedSystemSteps.add(name)
+            outstandingSystemSteps.remove(name)
             true
         } catch (t: Throwable) {
-            Log.e("hook step '$name' failed", t)
+            outstandingSystemSteps.add(name)
+            Log.w("hook step '$name' not installed yet: $t")
             false
         }
     }
@@ -263,6 +277,8 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
 
         val systemServerLock = Any()
         val installedSystemSteps = ConcurrentHashMap.newKeySet<String>()
+        /** Steps that have failed at least once and have not since succeeded. */
+        val outstandingSystemSteps = ConcurrentHashMap.newKeySet<String>()
         @Volatile var systemServerHooked = false
         val systemServerRetryScheduled = AtomicBoolean(false)
         val systemServerRetryCount = AtomicInteger(0)

@@ -44,8 +44,14 @@ class PhoneInterfaceManagerHooker {
                     .distinct().sorted().joinToString()
         )
 
-        matchedMethods(clazz, "getImeiForSlot") {
-            name == "getImeiForSlot" && isPublic
+        // getPrimaryImei as well as the per-slot one. They are two ways of
+        // asking the same question - TelephonyManager.getImei() and
+        // getPrimaryImei() - and answering only the first left a device
+        // reporting a made-up IMEI to one call and its real one to the other,
+        // which is worse than reporting the real one to both.
+        matchedMethods(clazz, "getImei") {
+            (name == "getImeiForSlot" || name == "getPrimaryImei") && isPublic &&
+                returnType == String::class.java
         }.hookMethod {
             after { param ->
                 if (param.hasThrowable()) return@after
@@ -54,7 +60,7 @@ class PhoneInterfaceManagerHooker {
                 val customIMEI = profile.deviceImei
 
                 param.result = customIMEI
-                Log.i("[Cellar] getImeiForSlot for $packageName -> $customIMEI")
+                Log.i("[Cellar] ${param.method.name} for $packageName -> $customIMEI")
             }
         }
 

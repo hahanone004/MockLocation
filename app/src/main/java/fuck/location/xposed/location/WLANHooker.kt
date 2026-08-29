@@ -41,7 +41,17 @@ class WLANHooker {
                 "serviceLoader=$serviceLoader"
         )
         if (loadWatchers.isEmpty() && serviceLoader == null) {
-            throw NoSuchMethodException("loadClassFromLoader in ${clazz.name}")
+            // Not a missing method so much as a service that has not started.
+            // loadClassFromLoader is gone from SystemServiceManager on current
+            // releases, so the only way in is the Wi-Fi apex loader, and that
+            // does not exist until the service is up - which is a little after
+            // the module installs its hooks. Saying "loadClassFromLoader is
+            // missing" sent everyone looking at the wrong thing; the retry a
+            // few seconds later is what actually fixes it.
+            throw IllegalStateException(
+                "the wifi service has not started yet, and ${clazz.name} has no " +
+                    "loadClassFromLoader to wait on; a retry should catch it"
+            )
         }
         installOnce(loadWatchers, hookedLoadWatcherMethods) { method ->
             method.hookMethod {
