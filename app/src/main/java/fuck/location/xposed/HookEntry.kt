@@ -50,7 +50,10 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 // A real zygote cannot see the system server's classes yet.
                 // systemMain is where it becomes one, and hooks survive the
                 // fork, so arm it and come back.
-                Log.i("waiting for ActivityThread.systemMain")
+                // The branch every process that is not system_server takes,
+                // so it says nothing on its own; "loaded" above already
+                // reports that the module is in this process.
+                Log.d { "waiting for ActivityThread.systemMain" }
 
                 val systemMain = findAllMethods(Class.forName("android.app.ActivityThread")) {
                     name == "systemMain" && isStatic

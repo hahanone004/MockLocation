@@ -892,8 +892,15 @@ class ConfigGateway private constructor() {
 
         val names = File(SYSTEM_DIR).list()
         if (names == null) {
-            Log.w("cannot list $SYSTEM_DIR from this process, so the config directory is not " +
-                "resolvable here; system_server will resolve it")
+            // Every app process lands here: only system_server can list that
+            // directory, and it is the one that resolves the path. Nothing has
+            // gone wrong, so this is not a warning - if system_server itself
+            // cannot resolve it, requireDataPath throws and the hook step says
+            // so under its own name.
+            Log.d {
+                "cannot list $SYSTEM_DIR from this process, so the config directory is not " +
+                    "resolvable here; system_server will resolve it"
+            }
             return
         }
 
