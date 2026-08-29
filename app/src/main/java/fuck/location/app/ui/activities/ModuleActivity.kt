@@ -27,6 +27,7 @@ import kotlin.concurrent.thread
 import fuck.location.app.ui.config.ProfileEditors
 import fuck.location.app.ui.models.AppListModel
 import fuck.location.xposed.helpers.ConfigGateway
+import java.util.concurrent.atomic.AtomicLong
 import java.util.stream.Collectors
 
 @ExperimentalStdlibApi
@@ -36,9 +37,17 @@ class ModuleActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivitySelectAppsBinding
     private lateinit var oneAdapter: OneAdapter
-    private var packageInfos: List<AppListModel> = arrayListOf()   // Prevent from search crash
 
-    private var searchKeyword = ""
+    /** Written on a worker, read on others; publish it rather than tear it. */
+    @Volatile private var packageInfos: List<AppListModel> = emptyList()
+    @Volatile private var searchKeyword = ""
+
+    /**
+     * Which render is the current one. Every keystroke used to start its own
+     * thread and hand its results straight to the adapter, so a slow filter for
+     * an early keystroke could land after - and overwrite - a later one's.
+     */
+    private val renderGeneration = AtomicLong(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -51,7 +60,9 @@ class ModuleActivity : AppCompatActivity() {
 
         recyclerView = binding.recycler
         oneAdapter = OneAdapter(recyclerView) {
-            itemModules += AppListModule(this@ModuleActivity) { this@ModuleActivity.refresh() }
+            itemModules += AppListModule(this@ModuleActivity) {
+                this@ModuleActivity.refreshAssignments()
+            }
             emptinessModule = EmptyListModule()
         }
 
@@ -92,11 +103,11 @@ class ModuleActivity : AppCompatActivity() {
             }
 
             override fun onQueryTextChange(newText: String?): Boolean {
-                searchKeyword = newText?.lowercase() ?: ""
+                val keyword = newText?.lowercase() ?: ""
+                searchKeyword = keyword
 
-                thread {
-                    updateSearchResult(searchKeyword)
-                }
+                val generation = renderGeneration.incrementAndGet()
+                thread { render(keyword, generation) }
 
                 return true
             }
@@ -108,16 +119,43 @@ class ModuleActivity : AppCompatActivity() {
         return super.onPrepareOptionsMenu(menu)
     }
 
+    /** The whole list, labels and icons alike. Pull to refresh, and on entry. */
     private fun refresh() {
+        val generation = renderGeneration.incrementAndGet()
         thread {
-            initAppListView()
+            updateInstalledPackages()
+            render(searchKeyword, generation)
             runOnMainThread { refreshLayout.finishRefresh() }
         }
     }
 
-    private fun initAppListView() {
-        updateInstalledPackages()
-        updateSearchResult(searchKeyword)
+    /**
+     * Only the assignment labels, after one has been changed from this screen.
+     *
+     * Reloading everything was the old answer, but that re-enumerated every
+     * installed package and decoded every icon on the device for a single tap.
+     * Nothing else can have changed - and assigning one app can still relabel
+     * another, since the Play Services prompt assigns a second package - so
+     * every label is recomputed and no package is looked up again.
+     *
+     * New models rather than edited ones: the adapter diffs by content, and a
+     * label changed in place is invisible to it.
+     */
+    private fun refreshAssignments() {
+        val generation = renderGeneration.incrementAndGet()
+        thread {
+            val store = ConfigGateway.get().readProfileStore()
+
+            packageInfos = packageInfos.map { model ->
+                AppListModel(
+                    model.title,
+                    model.packageName,
+                    model.icon,
+                    ProfileEditors.assignmentLabel(this, store, model.packageName),
+                )
+            }
+            render(searchKeyword, generation)
+        }
     }
 
     private fun updateInstalledPackages() {
@@ -125,7 +163,11 @@ class ModuleActivity : AppCompatActivity() {
         val displayNameComparator = ApplicationInfo.DisplayNameComparator(this.packageManager)
 
         packageInfos = this.packageManager.getInstalledPackages(0)
-            .parallelStream().sorted { lhs, rhs ->
+            .parallelStream()
+            // Before the sort, not after: applicationInfo is null for packages
+            // we cannot fully see, and the comparator below dereferences it.
+            .filter { it.applicationInfo != null }
+            .sorted { lhs, rhs ->
                 // Apps being spoofed float to the top; the rest stay alphabetical.
                 val lAssigned = store.assignments.containsKey(lhs.packageName)
                 val rAssigned = store.assignments.containsKey(rhs.packageName)
@@ -135,7 +177,7 @@ class ModuleActivity : AppCompatActivity() {
                     lAssigned -> -1
                     else -> 1
                 }
-            }.filter { it.applicationInfo != null }    // null for packages we cannot fully see
+            }
             .map {
                 val applicationInfo = it.applicationInfo!!
                 val packageName = applicationInfo.packageName
@@ -147,18 +189,17 @@ class ModuleActivity : AppCompatActivity() {
             }.collect(Collectors.toList())
     }
 
-    private fun updateSearchResult(keyword: String) {
-
-        val searchResult = if (keyword.isNotEmpty()) {
-            packageInfos.parallelStream().filter {
-                it.title.lowercase().contains(keyword)
-            }.collect(Collectors.toList())
+    private fun render(keyword: String, generation: Long) {
+        val snapshot = packageInfos
+        val searchResult = if (keyword.isEmpty()) {
+            snapshot
         } else {
-            packageInfos
+            snapshot.filter { it.title.lowercase().contains(keyword) }
         }
 
         runOnMainThread {
-            oneAdapter.setItems(searchResult)
+            // A render for an earlier keystroke must not land on a later one.
+            if (generation == renderGeneration.get()) oneAdapter.setItems(searchResult)
         }
     }
 

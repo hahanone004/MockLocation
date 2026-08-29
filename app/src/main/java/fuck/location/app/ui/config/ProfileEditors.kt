@@ -1,5 +1,6 @@
 package fuck.location.app.ui.config
 
+import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.text.Editable
@@ -23,8 +24,9 @@ import fuck.location.app.ui.models.CarrierCatalog
 import fuck.location.app.ui.models.Profile
 import fuck.location.app.ui.models.ProfileStore
 import fuck.location.xposed.helpers.ConfigGateway
-import java.text.NumberFormat
+import java.util.Collections
 import java.util.UUID
+import java.util.WeakHashMap
 
 /**
  * The dialogs behind a profile's four spoofs and the profile library.
@@ -38,12 +40,6 @@ object ProfileEditors {
 
     private const val PLAY_SERVICES = "com.google.android.gms"
     private val LTE_BANDWIDTHS = setOf(0, 1_400, 3_000, 5_000, 10_000, 15_000, 20_000)
-
-    /** Enough decimals that a coordinate survives a round trip through the UI. */
-    private val plainNumber: NumberFormat = NumberFormat.getNumberInstance().apply {
-        isGroupingUsed = false
-        maximumFractionDigits = 20
-    }
 
     // region feature editors
 
@@ -59,9 +55,12 @@ object ProfileEditors {
             val view = getCustomView()
             view.findViewById<SwitchMaterial>(R.id.switch_location_enabled).isChecked =
                 profile.locationEnabled
-            view.findViewById<EditText>(R.id.field_latitude).setText(plainNumber.format(profile.x))
-            view.findViewById<EditText>(R.id.field_longitude).setText(plainNumber.format(profile.y))
-            view.findViewById<EditText>(R.id.field_offset).setText(plainNumber.format(profile.offset))
+            view.findViewById<EditText>(R.id.field_latitude)
+                .setText(CoordinateFormat.format(profile.x))
+            view.findViewById<EditText>(R.id.field_longitude)
+                .setText(CoordinateFormat.format(profile.y))
+            view.findViewById<EditText>(R.id.field_offset)
+                .setText(CoordinateFormat.format(profile.offset))
 
             keepClearOfKeyboard()
 
@@ -139,7 +138,10 @@ object ProfileEditors {
                 val valid = !cellEnabled || mcc.matches(Regex("^[0-9]{3}$")) &&
                     mnc.matches(Regex("^[0-9]{2,3}$")) &&
                     tac != null && tac in 0..65_535 &&
-                    eci != null && eci in 0..268_435_455 &&
+                    // 0 is not a cell: Profile.describesCell rejects it, so
+                    // accepting it here saved a profile whose switch was on and
+                    // whose hooks then reported no cell at all.
+                    eci != null && eci in 1..268_435_455 &&
                     pci != null && pci in 0..503 &&
                     earfcn != null && earfcn in 0..262_143 &&
                     bandwidth != null && bandwidth in LTE_BANDWIDTHS
@@ -319,13 +321,15 @@ object ProfileEditors {
                 val picked = carrier
                 val simEnabled = fields.switched(R.id.switch_sim_enabled)
                 val localeEnabled = fields.switched(R.id.switch_locale_enabled)
-                val phoneNumber = fields.text(R.id.field_phone_number)
-                val simSerial = fields.text(R.id.field_sim_serial)
+                // The phone keypad offers +, spaces, dashes and brackets, and a
+                // pasted number brings its own formatting; the digits are the
+                // number. Rejecting the rest turned an ordinary way of typing
+                // it into a bare "invalid" toast.
+                val phoneNumber = fields.text(R.id.field_phone_number).filter(Char::isDigit)
+                val simSerial = fields.text(R.id.field_sim_serial).filter(Char::isDigit)
                 val valid = (!localeEnabled || simEnabled) && (!simEnabled ||
                     picked != null &&
-                    phoneNumber.all { it.isDigit() } &&
                     phoneNumber.length == country.numberLength &&
-                    simSerial.all { it.isDigit() } &&
                     simSerial.length in 19..20 &&
                     CarrierCatalog.luhnValid(simSerial) &&
                     (!localeEnabled || country.locale.isNotBlank()))
@@ -396,9 +400,10 @@ object ProfileEditors {
             // the way to the activity's home screen.
             noAutoDismiss()
             title(R.string.title_profiles)
+            rebuildWhenStale(context) { manageProfiles(context, onChanged) }
             listItems(items = labels) { _, index, _ ->
-                if (index == store.profiles.size) createProfile(context, onChanged)
-                else profileActions(context, store.profiles[index].id, onChanged)
+                if (index == store.profiles.size) createProfile(context, changed(onChanged))
+                else profileActions(context, store.profiles[index].id, changed(onChanged))
             }
         }
     }
@@ -463,23 +468,28 @@ object ProfileEditors {
             // menu below them so Back returns here instead of to the home page.
             noAutoDismiss()
             title(text = profile.displayName(context))
+            // The on/off suffixes above were read when this menu was built, so
+            // returning from a feature editor that flipped one showed the old
+            // answer until the whole menu was reopened.
+            rebuildWhenStale(context) { profileActions(context, profileId, onChanged) }
+            val notify = changed(onChanged)
             listItems(items = actions) { dialog, index, _ ->
                 when (index) {
-                    0 -> editLocation(context, profileId, onChanged)
-                    1 -> editCell(context, profileId, onChanged)
-                    2 -> editWifi(context, profileId, onChanged)
-                    3 -> editSim(context, profileId, onChanged)
+                    0 -> editLocation(context, profileId, notify)
+                    1 -> editCell(context, profileId, notify)
+                    2 -> editWifi(context, profileId, notify)
+                    3 -> editSim(context, profileId, notify)
                     4 -> {
                         val current = ConfigGateway.get().readProfileStore()
-                        save(context, current.copy(defaultProfileId = profileId), onChanged)
+                        save(context, current.copy(defaultProfileId = profileId), notify)
                     }
-                    5 -> renameProfile(context, profileId, onChanged)
+                    5 -> renameProfile(context, profileId, notify)
                     6 -> deleteProfile(context, profileId) {
                         // The menu refers to an object that no longer exists.
                         // Close just this level; the profile library remains
                         // underneath and Back navigation stays coherent.
                         dialog.dismiss()
-                        onChanged()
+                        notify()
                     }
                 }
             }
@@ -750,6 +760,60 @@ object ProfileEditors {
         }
     }
 
+    /**
+     * Dialogs that something above them has since edited the store under.
+     *
+     * Held weakly and keyed by the dialog itself: a menu that is dismissed
+     * before it can act on the mark - deleting the profile it describes, say -
+     * simply never redraws, and must not keep itself alive to find that out.
+     */
+    private val staleDialogs: MutableSet<MaterialDialog> =
+        Collections.newSetFromMap(WeakHashMap())
+
+    /**
+     * Wraps [onChanged] so that acting on it also marks this dialog for a
+     * redraw. Marking rather than redrawing on the spot is the point: the child
+     * that reports the change is still on screen, and rebuilding underneath it
+     * would put this menu back on top of the dialog the user is looking at.
+     */
+    private fun MaterialDialog.changed(onChanged: () -> Unit): () -> Unit = {
+        staleDialogs.add(this)
+        onChanged()
+    }
+
+    /**
+     * Redraws a menu once the dialogs above it are gone.
+     *
+     * These menus stay open underneath the ones they open, which is what makes
+     * Back walk back up the levels - but it also means their contents are a
+     * snapshot taken when they were built. A profile created, renamed or
+     * deleted above left this list naming something that no longer exists, and
+     * the click handler resolving an index into that same snapshot then landed
+     * on the wrong profile, or on none, which reads as the menu ignoring the
+     * tap. Regaining window focus is the moment nothing is covering it.
+     */
+    private fun MaterialDialog.rebuildWhenStale(context: Context, rebuild: () -> Unit) {
+        val decor = window?.decorView ?: return
+
+        decor.viewTreeObserver.addOnWindowFocusChangeListener { hasFocus ->
+            if (!hasFocus || !staleDialogs.remove(this)) return@addOnWindowFocusChangeListener
+
+            decor.post {
+                // A dialog opened again in the meantime - the editors chain
+                // straight into the next menu - so wait for the next time this
+                // one is really the top of the stack.
+                if (!decor.hasWindowFocus()) {
+                    staleDialogs.add(this)
+                    return@post
+                }
+                if (!isShowing || (context as? Activity)?.isFinishing == true) return@post
+
+                dismiss()
+                rebuild()
+            }
+        }
+    }
+
     private fun ProfileStore.replacing(profile: Profile): ProfileStore =
         copy(profiles = profiles.map { if (it.id == profile.id) profile else it })
 
@@ -767,11 +831,8 @@ object ProfileEditors {
     private fun View.text(id: Int): String =
         findViewById<EditText>(id).text.toString().trim()
 
-    private fun View.integer(id: Int, fallback: Int): Int =
-        text(id).toIntOrNull() ?: fallback
-
     private fun View.decimal(id: Int, fallback: Double): Double =
-        text(id).toDoubleOrNull() ?: fallback
+        CoordinateFormat.parse(text(id)) ?: fallback
 
     private fun View.switched(id: Int): Boolean =
         findViewById<SwitchMaterial>(id).isChecked

@@ -9,12 +9,10 @@ import android.os.SystemClock
 import fuck.location.BuildConfig
 import fuck.location.xposed.helpers.reflect.*
 import com.squareup.moshi.JsonAdapter
-import com.squareup.moshi.JsonDataException
 import com.squareup.moshi.Moshi
 import com.squareup.moshi.adapter
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 import fuck.location.R
 import fuck.location.app.ui.models.LegacyFakeLocation
 import fuck.location.app.ui.models.Profile
@@ -22,7 +20,6 @@ import fuck.location.app.ui.models.ProfileStore
 import org.lsposed.hiddenapibypass.HiddenApiBypass
 import java.io.File
 import java.io.FileOutputStream
-import java.io.FileNotFoundException
 import java.lang.Exception
 import java.lang.IllegalArgumentException
 import java.lang.reflect.Field
@@ -44,6 +41,7 @@ class ConfigGateway private constructor() {
 
     // Every ProfileStore field has a default, so this parses into a usable config
     private val EMPTY_CONFIG = "{}"
+    private val EMPTY_PACKAGE_LIST = "[]"
 
     private val moshi = Moshi.Builder().add(KotlinJsonAdapterFactory()).build()
     private lateinit var dataDir: String
@@ -57,12 +55,33 @@ class ConfigGateway private constructor() {
      * picks a change up within the window.
      */
     private val cacheMillis = 2_000L
+
+    /**
+     * A query that could not be made is retried far sooner than an answer is
+     * refreshed: whatever stopped it - no Context yet, the framework half
+     * still starting - usually clears in well under a second, and until it
+     * does the hooks are substituting nothing.
+     */
+    private val unresolvedCacheMillis = 250L
     @Volatile private var cachedStore: ProfileStore? = null
     @Volatile private var cachedAt = 0L
 
     /** Last logged resolution per package; hooks resolve from many threads. */
     private val announced = ConcurrentHashMap<String, String>()
-    private data class CachedProfile(val profile: Profile?, val at: Long)
+    /**
+     * [answered] separates a real answer from the framework side - including a
+     * deliberate "this app has no profile" - from not having been able to ask.
+     * The two used to be the same null, and a failure was then held for the
+     * full window like any other answer.
+     */
+    private data class CachedProfile(
+        val profile: Profile?,
+        val at: Long,
+        val answered: Boolean,
+    )
+
+    /** The outcome of one query over the config channel. */
+    private data class Resolution(val profile: Profile?, val answered: Boolean)
     private val cachedProfiles = ConcurrentHashMap<String, CachedProfile>()
     private val lastServedProfiles = ConcurrentHashMap<String, String>()
 
@@ -78,18 +97,18 @@ class ConfigGateway private constructor() {
      */
 
     companion object {
-        // TODO: Memory leak
-        private var instance: ConfigGateway? = null
-            get() {
-                if (field == null) {
-                    field = ConfigGateway()
-                }
-                return field
-            }
+        /*
+         * Every hook resolves the gateway through get(), and in system_server
+         * that happens on many binder threads at once. A null-check-then-assign
+         * getter could hand two threads two different objects, one of which
+         * then loses the race to the field - and since dataDir, the caches and
+         * the announced map all hang off the instance, a thread left holding
+         * the loser read the config through an object whose dataDir had never
+         * been set. lazy resolves exactly once, for every caller.
+         */
+        private val instance: ConfigGateway by lazy { ConfigGateway() }
 
-        fun get(): ConfigGateway {
-            return instance!!
-        }
+        fun get(): ConfigGateway = instance
 
         const val SYSTEM_DIR = "/data/system"
         const val CONFIG_DIR_PREFIX = "fuck_location"
@@ -161,7 +180,7 @@ class ConfigGateway private constructor() {
                 findAllMethods(classLoader.loadClass(className), findSuper = true) {
                     name == "getInstallerPackageName" && parameterCount == 1
                 }.takeIf { it.isNotEmpty() }
-                    ?.also { XposedBridge.log("FL: config read channel bound to $className") }
+                    ?.also { Log.i("config read channel bound to $className") }
             }.getOrNull()
         } ?: throw NoSuchMethodException("getInstallerPackageName not found in any of $candidates")
 
@@ -245,35 +264,50 @@ class ConfigGateway private constructor() {
     private fun callerOwnsPackage(packageName: String): Boolean =
         packagesForUid(Binder.getCallingUid()).any { it == packageName }
 
+    /**
+     * Which packages share [uid], which is how a caller is matched to the
+     * profile it is allowed to ask about.
+     *
+     * The public PackageManager goes first. AppGlobals used to, and inside
+     * system_server it hands back PackageManagerService's IPackageManagerImpl,
+     * which inherits getPackagesForUid from IPackageManagerBase - while
+     * HiddenApiBypass only ever looks at a class's own declared methods. So
+     * that route raised "Cannot find matching method" on every single profile
+     * query, logged a warning, and fell through to the Context below anyway.
+     * It stays as the fallback because Vector builds differ in which
+     * hidden-API exemptions reach system_server.
+     */
     private fun packagesForUid(uid: Int): List<String> {
-        try {
+        val context = systemContext() ?: if (this::customContext.isInitialized) {
+            customContext
+        } else null
+
+        if (context != null) {
+            try {
+                val packages = context.packageManager.getPackagesForUid(uid).orEmpty()
+                if (packages.isNotEmpty()) return packages.toList()
+            } catch (t: Throwable) {
+                Log.w("system Context cannot resolve packages for uid $uid: $t")
+            }
+        }
+
+        return try {
             val appGlobals = Class.forName("android.app.AppGlobals")
             val packageManager = HiddenApiBypass.invoke(
                 appGlobals,
                 null,
                 "getPackageManager",
             ) ?: throw IllegalStateException("AppGlobals has no package manager")
-            val packages = (HiddenApiBypass.invoke(
+            (HiddenApiBypass.invoke(
                 packageManager.javaClass,
                 packageManager,
                 "getPackagesForUid",
                 uid,
             ) as? Array<*>)?.filterIsInstance<String>().orEmpty()
-            if (packages.isNotEmpty()) return packages
         } catch (t: Throwable) {
-            Log.w("AppGlobals cannot resolve packages for uid $uid: $t")
-        }
-
-        // Vector builds differ in which hidden-API exemptions reach
-        // system_server. Fall back to its system Context, then to the Context
-        // already supplied by an ordinary Application.attach.
-        return try {
-            val context = systemContext() ?: if (this::customContext.isInitialized) {
-                customContext
-            } else null
-            context?.packageManager?.getPackagesForUid(uid)?.toList().orEmpty()
-        } catch (t: Throwable) {
-            Log.w("system Context cannot resolve packages for uid $uid: $t")
+            // Expected on any build where the impl class inherits the method,
+            // so this is a debug line rather than a warning per query.
+            Log.d { "AppGlobals cannot resolve packages for uid $uid: $t" }
             emptyList()
         }
     }
@@ -295,26 +329,34 @@ class ConfigGateway private constructor() {
     }
 
 
+    /**
+     * The pre-profile whitelist, for the one-time migration that folds it into
+     * assignments.
+     *
+     * The three answers are distinct on purpose. An empty list means there was
+     * nothing to carry over; null means this process cannot tell, and the
+     * migration is postponed rather than run on a guess - reading it as "empty"
+     * would switch off spoofs the user had turned on. The retry this used to
+     * make on a missing file re-read the identical path and could only fail the
+     * same way; a directory that was never resolved is the case that actually
+     * happens, and it used to throw straight out of the hook.
+     */
     @ExperimentalStdlibApi
     @Synchronized
     private fun readPackageListInternal(param: XC_MethodHook.MethodHookParam) {
-        var jsonFile = File("$dataDir/whiteList.json")
-
-        val json: String = try {
-            jsonFile.readText()
-        } catch (e: FileNotFoundException) {
-            Log.d("FL: whiteList.json not found. Trying to refresh File holder")
-            try {
-                jsonFile = File("$dataDir/whiteList.json")
-                jsonFile.readText()
-                Log.d("FL: whiteList.json resumed.")
-            } catch (e: FileNotFoundException) {
-                Log.d("FL: not possible to refresh. Fallback to []")
-            }
-            "[]"
+        if (!this::dataDir.isInitialized) {
+            Log.w("no config directory resolved, so the legacy whitelist cannot be read here")
+            param.result = null
+            return
         }
 
-        param.result = json
+        val jsonFile = File(dataDir, "whiteList.json")
+        param.result = try {
+            if (jsonFile.isFile) jsonFile.readText() else EMPTY_PACKAGE_LIST
+        } catch (t: Throwable) {
+            Log.w("cannot read the legacy whitelist: $t")
+            null
+        }
     }
 
     @ExperimentalStdlibApi
@@ -395,16 +437,30 @@ class ConfigGateway private constructor() {
         }
     }
 
-    private fun universalAPICaller(string: String, action: Int): Any? {
-        val magicContext: Context = try {
-            AndroidAppHelper.currentApplication()?.applicationContext
+    /**
+     * Any Context that can make the binder call.
+     *
+     * The application's own is preferred, but it does not exist yet when a
+     * hook fires early in a process's life - and the SIM hooks are installed
+     * at load time, so a target app reads its operator fields inside that very
+     * window. Answering "no profile" there meant the app saw the real SIM.
+     * ActivityThread has a system Context from well before the Application is
+     * made, and it is enough to reach the config channel.
+     */
+    private fun magicContext(): Context {
+        try {
+            AndroidAppHelper.currentApplication()?.applicationContext?.let { return it }
         } catch (_: NoClassDefFoundError) {
-            null
-        } ?: if (this::customContext.isInitialized) {
-            customContext
-        } else {
-            throw IllegalStateException("no application Context is available yet")
+            // Not running under a framework at all; the fallbacks still apply.
         }
+        if (this::customContext.isInitialized) return customContext
+
+        return systemContext()
+            ?: throw IllegalStateException("no Context is available yet")
+    }
+
+    private fun universalAPICaller(string: String, action: Int): Any? {
+        val magicContext: Context = magicContext()
 
         val activityManager =
             magicContext.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
@@ -447,37 +503,45 @@ class ConfigGateway private constructor() {
         val app = packageName.substringBefore(':')
         val now = SystemClock.elapsedRealtime()
         val cached = cachedProfiles[app]
-        val profile = if (cached != null && now - cached.at < cacheMillis) {
-            cached.profile
-        } else {
-            readResolvedProfile(app).also { cachedProfiles[app] = CachedProfile(it, now) }
+        val window = if (cached?.answered == false) unresolvedCacheMillis else cacheMillis
+
+        if (cached != null && now - cached.at < window) {
+            announce(app, cached.profile)
+            return cached.profile
         }
 
-        announce(app, profile)
-        return profile
+        val resolution = readResolvedProfile(app)
+        cachedProfiles[app] = CachedProfile(resolution.profile, now, resolution.answered)
+
+        announce(app, resolution.profile)
+        return resolution.profile
     }
 
     @ExperimentalStdlibApi
-    private fun readResolvedProfile(packageName: String): Profile? {
+    private fun readResolvedProfile(packageName: String): Resolution {
+        // Whatever the last good answer was, it is the best guess while the
+        // channel is unusable - better than dropping the spoof mid-session.
+        val lastKnown = Resolution(cachedProfiles[packageName]?.profile, answered = false)
+
         val json = try {
             universalAPICaller(packageName, 5) as? String
                 ?: throw IllegalStateException("profile channel returned null")
         } catch (t: Throwable) {
             Log.w("Cannot resolve profile for $packageName: $t")
-            return cachedProfiles[packageName]?.profile
+            return lastKnown
         }
         if (json == profileReadError) {
             Log.w("Profile query for $packageName failed; keeping the last valid copy")
-            return cachedProfiles[packageName]?.profile
+            return lastKnown
         }
-        if (json == "null") return null
+        if (json == "null") return Resolution(null, answered = true)
 
         return try {
             val adapter: JsonAdapter<Profile> = moshi.adapter()
-            adapter.fromJson(json)
+            Resolution(adapter.fromJson(json), answered = true)
         } catch (t: Throwable) {
             Log.w("Profile for $packageName is unreadable: $t")
-            cachedProfiles[packageName]?.profile
+            lastKnown
         }
     }
 
@@ -503,6 +567,24 @@ class ConfigGateway private constructor() {
             Log.i("$packageName -> $decision")
         }
     }
+
+    /**
+     * The first argument of a hooked framework method that names an app [spoof]
+     * applies to, together with the profile it resolved to.
+     *
+     * Which argument carries the calling package moves between Android releases
+     * and is surrounded by feature and attribution tags that are strings too,
+     * so every one of them is offered to [spoof] and the first that answers
+     * wins. Null when no argument names an app this spoof applies to, which is
+     * the signal to leave the call alone.
+     */
+    fun spoofedCaller(
+        param: XC_MethodHook.MethodHookParam,
+        spoof: (String) -> Profile?,
+    ): Pair<String, Profile>? =
+        param.args.orEmpty().filterIsInstance<String>().firstNotNullOfOrNull { candidate ->
+            spoof(candidate)?.let { candidate to it }
+        }
 
     @ExperimentalStdlibApi
     fun locationSpoofFor(packageName: String): Profile? =
@@ -810,8 +892,15 @@ class ConfigGateway private constructor() {
 
         val names = File(SYSTEM_DIR).list()
         if (names == null) {
-            Log.w("cannot list $SYSTEM_DIR from this process, so the config directory is not " +
-                "resolvable here; system_server will resolve it")
+            // Every app process lands here: only system_server can list that
+            // directory, and it is the one that resolves the path. Nothing has
+            // gone wrong, so this is not a warning - if system_server itself
+            // cannot resolve it, requireDataPath throws and the hook step says
+            // so under its own name.
+            Log.d {
+                "cannot list $SYSTEM_DIR from this process, so the config directory is not " +
+                    "resolvable here; system_server will resolve it"
+            }
             return
         }
 

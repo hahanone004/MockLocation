@@ -1,10 +1,10 @@
 package fuck.location.xposed.cellar
 
 import android.annotation.SuppressLint
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.app.ui.models.Profile
 import fuck.location.xposed.helpers.ConfigGateway
+import fuck.location.xposed.helpers.reflect.Log
 import fuck.location.xposed.helpers.reflect.findAllMethods
 import fuck.location.xposed.helpers.reflect.hookMethod
 
@@ -50,7 +50,7 @@ class SimIdentityHooker {
             throw NoSuchMethodException("no SIM identity methods for $packageName")
         }
 
-        XposedBridge.log("FL: [Cellar] SIM identity hooks armed for $packageName")
+        Log.i("[Cellar] SIM identity hooks armed for $packageName")
     }
 
     /**
@@ -118,9 +118,9 @@ class SimIdentityHooker {
                 if (param.hasThrowable()) return@after
                 // Pick the String that actually resolves to a configured app;
                 // feature and attribution tags may surround it on newer APIs.
-                val matched = param.args.filterIsInstance<String>().firstNotNullOfOrNull { caller ->
-                    ConfigGateway.get().simSpoofFor(caller)?.let { caller to it }
-                } ?: return@after
+                val matched = ConfigGateway.get()
+                    .spoofedCaller(param) { ConfigGateway.get().simSpoofFor(it) }
+                    ?: return@after
                 val spoofed = value(matched.second)
 
                 if (spoofed.isNotBlank()) param.result = spoofed
@@ -137,7 +137,7 @@ class SimIdentityHooker {
         val clazz = try {
             lpparam.classLoader.loadClass(className)
         } catch (e: ClassNotFoundException) {
-            XposedBridge.log("FL: [Cellar] $className is absent, skipping ${names.joinToString()}")
+            Log.w("[Cellar] $className is absent, skipping ${names.joinToString()}")
             return emptyList()
         }
 
@@ -145,7 +145,7 @@ class SimIdentityHooker {
             name in names && returnType == String::class.java
         }
         if (methods.isEmpty()) {
-            XposedBridge.log("FL: [Cellar] no ${names.joinToString()} methods in $className")
+            Log.i("[Cellar] no ${names.joinToString()} methods in $className")
         }
         return methods
     }

@@ -59,6 +59,40 @@ class WifiListFormatTest {
     }
 
     @Test
+    fun `a pipe in the network name survives the round trip`() {
+        val accessPoints = listOf(
+            FakeAccessPoint("Cafe | Free", "a4:2b:b0:11:22:33", -52, 2437),
+        )
+
+        assertEquals(accessPoints, WifiListFormat.parse(WifiListFormat.format(accessPoints)))
+    }
+
+    @Test
+    fun `a backslash in the network name survives the round trip`() {
+        val accessPoints = listOf(
+            FakeAccessPoint("Back\\slash", "a4:2b:b0:11:22:33", -52, 2437),
+        )
+
+        assertEquals(accessPoints, WifiListFormat.parse(WifiListFormat.format(accessPoints)))
+    }
+
+    @Test
+    fun `capabilities are not reset by editing the list`() {
+        val accessPoints = listOf(
+            FakeAccessPoint("Open Wifi", "a4:2b:b0:11:22:33", -52, 2437, "[ESS]"),
+        )
+
+        assertEquals(accessPoints, WifiListFormat.parse(WifiListFormat.format(accessPoints)))
+    }
+
+    @Test
+    fun `an omitted capabilities field keeps the default`() {
+        val parsed = WifiListFormat.parse("Home | a4:2b:b0:11:22:33 | -52 | 2437")[0]
+
+        assertEquals(FakeAccessPoint().capabilities, parsed.capabilities)
+    }
+
+    @Test
     fun `unreadable numbers fall back rather than dropping the access point`() {
         val parsed = WifiListFormat.parse("Home | a4:2b:b0:11:22:33 | strong | wide")[0]
 

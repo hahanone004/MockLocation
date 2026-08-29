@@ -3,14 +3,15 @@ package fuck.location.xposed
 import android.annotation.SuppressLint
 import android.os.Build
 import android.os.Handler
+import android.os.Process
 import android.os.Looper
 import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.BuildConfig
 
+import fuck.location.xposed.cellar.NetworkTypeHooker
 import fuck.location.xposed.cellar.PhoneInterfaceManagerHooker
 import fuck.location.xposed.cellar.SimIdentityHooker
 import fuck.location.xposed.cellar.TelephonyRegistryHooker
@@ -50,7 +51,10 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 // A real zygote cannot see the system server's classes yet.
                 // systemMain is where it becomes one, and hooks survive the
                 // fork, so arm it and come back.
-                Log.i("waiting for ActivityThread.systemMain")
+                // The branch every process that is not system_server takes,
+                // so it says nothing on its own; "loaded" above already
+                // reports that the module is in this process.
+                Log.d { "waiting for ActivityThread.systemMain" }
 
                 val systemMain = findAllMethods(Class.forName("android.app.ActivityThread")) {
                     name == "systemMain" && isStatic
@@ -78,7 +82,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
 
         when (lpparam.packageName) {
             BuildConfig.APPLICATION_ID -> {
-                XposedBridge.log("FL: Try to hook the module")
+                Log.d { "Try to hook the module" }
                 val clazz = lpparam.classLoader.loadClass("fuck.location.app.ui.activities.MainActivity")
 
                 val activationMethods = findAllMethods(clazz, findSuper = true) {
@@ -89,7 +93,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 }
                 activationMethods.hookMethod {
                     after { param ->
-                        XposedBridge.log("FL: Unlock the module")
+                        Log.d { "Unlock the module" }
                         param.result = true
                     }
                 }
@@ -104,6 +108,9 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 step("sim identity (phone)") {
                     SimIdentityHooker().hookPhoneProcess(lpparam)
                 }
+                step("network type") {
+                    NetworkTypeHooker().hookPhoneProcess(lpparam)
+                }
             }
 
             else -> {
@@ -112,6 +119,8 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 // TelephonyManager answers most of it without leaving the
                 // process. The hooks check the profile when they fire, so
                 // installing them costs an app nothing until it is configured.
+                if (!ownsProcess(lpparam) || !isApplicationProcess(lpparam)) return
+
                 step("sim identity") {
                     SimIdentityHooker().hookTelephonyManager(lpparam)
                 }
@@ -120,6 +129,54 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 }
             }
         }
+    }
+
+    /**
+     * Whether this load is the app the process belongs to.
+     *
+     * handleLoadPackage fires for every package loaded into a process, not just
+     * its owner: WebView arrives this way inside whichever app is showing one.
+     * Hooking those installed a second copy of the same hooks on the very same
+     * bootclasspath methods - the classes come from the boot loader either way -
+     * and then asked the config channel about a package the caller does not own,
+     * which it rightly refused, once per query, in the log.
+     *
+     * A framework that does not fill the process name in gets the old
+     * behaviour rather than no hooks at all.
+     */
+    private fun ownsProcess(lpparam: XC_LoadPackage.LoadPackageParam): Boolean {
+        val process = lpparam.processName
+        if (process.isNullOrEmpty()) return true
+        if (process.substringBefore(':') == lpparam.packageName) return true
+
+        Log.d { "skipping ${lpparam.packageName} loaded into $process" }
+        return false
+    }
+
+    /**
+     * Whether this process is an app at all.
+     *
+     * Several packages are loaded into system_server - the settings providers,
+     * telecom, the fused location provider - and handleLoadPackage reports each
+     * one. Installing the app-side hooks there put a substitution keyed to one
+     * of those package names onto TelephonyManager and LocaleList for the whole
+     * of system_server, where it would have answered for everybody: assigning a
+     * profile to a settings provider could have changed the system's own locale.
+     *
+     * It also explains the "rejecting profile query" warnings. Those hooks ran
+     * while system_server was servicing some app's binder call, so
+     * Binder.getCallingUid() reported that app rather than the system, and the
+     * config channel refused to answer for a package that app does not own.
+     *
+     * An app is always at or above the first application uid, so this needs no
+     * process name to be reported correctly.
+     */
+    private fun isApplicationProcess(lpparam: XC_LoadPackage.LoadPackageParam): Boolean {
+        val uid = Process.myUid()
+        if (uid >= FIRST_APPLICATION_UID) return true
+
+        Log.d { "skipping ${lpparam.packageName}: uid $uid is not an application" }
+        return false
     }
 
     /**
@@ -150,6 +207,13 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 installSystemStep("location DLC") {
                     LocationHooker().hookDLC(classLoader)
                 },
+                // Its own step: geofencing lives in a class that has moved
+                // between releases, and losing it used to fail getLastLocation's
+                // step too - which had already installed - so the retry loop ran
+                // to exhaustion reporting a failure that was half untrue.
+                installSystemStep("geofences") {
+                    LocationHooker().hookGeofences(classLoader)
+                },
                 installSystemStep("gnss") { GnssHooker().hookGnssCallbacks(classLoader) },
                 installSystemStep("wifi") { WLANHooker().hookWifiManager(classLoader) },
             ).all { it }
@@ -164,7 +228,10 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
 
     private fun scheduleSystemServerRetry(classLoader: ClassLoader) {
         if (systemServerRetryCount.get() >= MAX_SYSTEM_SERVER_RETRIES) {
-            Log.e("system_server hooks remain incomplete after $MAX_SYSTEM_SERVER_RETRIES retries")
+            Log.e(
+                "giving up after $MAX_SYSTEM_SERVER_RETRIES retries; still not installed: " +
+                    outstandingSystemSteps.sorted().joinToString()
+            )
             return
         }
         if (!systemServerRetryScheduled.compareAndSet(false, true)) return
@@ -181,14 +248,25 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
         }
     }
 
+    /**
+     * A step is only really lost once the retries are spent.
+     *
+     * Some of these cannot succeed on the first pass by construction - the
+     * Wi-Fi service starts a few seconds after the module installs its hooks -
+     * so a failure here is usually just "not yet". Logging every attempt at
+     * error level made an ordinary boot look broken; the give-up in
+     * [scheduleSystemServerRetry] is the line that means something.
+     */
     private inline fun installSystemStep(name: String, action: () -> Unit): Boolean {
         if (installedSystemSteps.contains(name)) return true
         return try {
             action()
             installedSystemSteps.add(name)
+            outstandingSystemSteps.remove(name)
             true
         } catch (t: Throwable) {
-            Log.e("hook step '$name' failed", t)
+            outstandingSystemSteps.add(name)
+            Log.w("hook step '$name' not installed yet: $t")
             false
         }
     }
@@ -229,9 +307,13 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
 
         val systemServerLock = Any()
         val installedSystemSteps = ConcurrentHashMap.newKeySet<String>()
+        /** Steps that have failed at least once and have not since succeeded. */
+        val outstandingSystemSteps = ConcurrentHashMap.newKeySet<String>()
         @Volatile var systemServerHooked = false
         val systemServerRetryScheduled = AtomicBoolean(false)
         val systemServerRetryCount = AtomicInteger(0)
+        /** Below this belongs to the platform; apps start here. */
+        const val FIRST_APPLICATION_UID = 10_000
         const val MAX_SYSTEM_SERVER_RETRIES = 6
         const val SYSTEM_SERVER_RETRY_DELAY_MS = 5_000L
     }
