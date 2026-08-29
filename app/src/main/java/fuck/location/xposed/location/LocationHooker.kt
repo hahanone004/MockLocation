@@ -63,12 +63,6 @@ class LocationHooker {
     fun hookDLC(classLoader: ClassLoader) {
         val clazz = classLoader.loadClass("com.android.server.location.LocationManagerService")
 
-        Log.i(
-            "[Location] DLC class loader=${clazz.classLoader} " +
-                "declared=${clazz.declaredMethods.size} nested=" +
-                clazz.declaredClasses.joinToString { it.name }
-        )
-
         val methods = findAllMethods(clazz, findSuper = true) {
             name == "getLastLocation" && isPublic
         }
@@ -107,17 +101,18 @@ class LocationHooker {
                     location.extras = null
                     clearInconsistentMotionFields(location)
 
-                    Log.i(
+                    Log.d {
                         "getLastLocation for $packageName -> " +
-                            "${location.latitude}, ${location.longitude}")
+                            "${location.latitude}, ${location.longitude}"
+                    }
                     it.result = location
                 } catch (e: Throwable) {
-                    Log.i("Fuck with exceptions! $e")
+                    Log.w("getLastLocation hook failed: $e")
                     // Once the caller has resolved to a spoofed profile, never
                     // leave the original real result in place on an error.
                     if (profile != null) {
                         it.result = fallbackLocation(profile!!)
-                        Log.i("getLastLocation fallback for $packageName")
+                        Log.w("getLastLocation fell back for $packageName")
                     }
                 }
                 }
@@ -140,12 +135,7 @@ class LocationHooker {
     @ExperimentalStdlibApi
     fun hookGeofences(classLoader: ClassLoader) {
         val state = GEOFENCE_HOLDERS.firstNotNullOfOrNull { className ->
-            runCatching { classLoader.loadClass(className) }
-                .onFailure {
-                    Log.d("[Location] geofence candidate unavailable: $className " +
-                        "(${it.javaClass.simpleName})")
-                }
-                .getOrNull()
+            runCatching { classLoader.loadClass(className) }.getOrNull()
         } ?: throw ClassNotFoundException("no geofence holder among $GEOFENCE_HOLDERS")
 
         // Resolved once while installing. A renamed ROM field has to make the
@@ -159,8 +149,7 @@ class LocationHooker {
         if (methods.isEmpty()) {
             throw NoSuchMethodException("onLocationChanged/processLocation in ${state.name}")
         }
-        Log.i("[Location] geofences hooked on ${state.name}.${methods.first().name}" +
-            " owner=${owner.name}")
+        Log.i("[Location] geofences hooked on ${state.simpleName}.${methods.first().name}")
 
         installServiceHooks(methods) { method -> method.hookBefore { param ->
                 val packageName = try {

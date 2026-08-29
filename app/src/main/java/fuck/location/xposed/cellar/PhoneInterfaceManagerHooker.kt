@@ -31,18 +31,7 @@ class PhoneInterfaceManagerHooker {
         val clazz: Class<*> =
             lpparam.classLoader.loadClass("com.android.phone.PhoneInterfaceManager")
 
-        Log.i(
-            "[Cellar] Finding method in PhoneInterfaceManager loader=${clazz.classLoader} " +
-                "declared=${clazz.declaredMethods.size}"
-        )
-        Log.d(
-            "[Cellar] PhoneInterfaceManager candidates=" +
-                clazz.methods.asSequence()
-                    .map { it.name }
-                    .filter { it.contains("Imei", true) || it.contains("Meid", true) ||
-                        it.contains("CellInfo", true) || it.contains("CellLocation", true) }
-                    .distinct().sorted().joinToString()
-        )
+        Log.d { "[Cellar] Finding method in PhoneInterfaceManager" }
 
         // getPrimaryImei as well as the per-slot one. They are two ways of
         // asking the same question - TelephonyManager.getImei() and
@@ -60,7 +49,7 @@ class PhoneInterfaceManagerHooker {
                 val customIMEI = profile.deviceImei
 
                 param.result = customIMEI
-                Log.i("[Cellar] ${param.method.name} for $packageName -> $customIMEI")
+                Log.d { "[Cellar] ${param.method.name} for $packageName -> $customIMEI" }
             }
         }
 
@@ -74,7 +63,7 @@ class PhoneInterfaceManagerHooker {
                 val customMEID = profile.deviceMeid
 
                 param.result = customMEID
-                Log.i("[Cellar] getMeidForSlot for $packageName -> $customMEID")
+                Log.d { "[Cellar] getMeidForSlot for $packageName -> $customMEID" }
             }
         }
 
@@ -93,7 +82,7 @@ class PhoneInterfaceManagerHooker {
                     null
                 }
 
-                Log.i("[Cellar] getCellLocation for $packageName -> ${param.result}")
+                Log.d { "[Cellar] getCellLocation for $packageName -> ${param.result}" }
             }
         }
 
@@ -120,7 +109,7 @@ class PhoneInterfaceManagerHooker {
                     Log.w("[Cellar] getAllCellInfo spoof failed, returning empty: $t")
                 }
 
-                Log.i("[Cellar] getAllCellInfo for $packageName -> ${cells.size} cell(s)")
+                Log.d { "[Cellar] getAllCellInfo for $packageName -> ${cells.size} cell(s)" }
                 param.result = cells
             }
         }
@@ -132,7 +121,7 @@ class PhoneInterfaceManagerHooker {
                 if (param.hasThrowable()) return@after
                 val (packageName, _) = spoofedCellProfile(param) ?: return@after
 
-                Log.i("[Cellar] getNeighboringCellInfo for $packageName -> empty")
+                Log.d { "[Cellar] getNeighboringCellInfo for $packageName -> empty" }
                 val customNeighboringCellInfo = ArrayList<NeighboringCellInfo>()
                 param.result = customNeighboringCellInfo
             }
@@ -199,9 +188,9 @@ class PhoneInterfaceManagerHooker {
                         val pending = takePendingCellInfo(callbackKey(param.thisObject))
                             ?: return@before
                         param.args[0] = spoofedCells(pending.profile)
-                        Log.i(
+                        Log.d {
                             "[Cellar] async CellInfo for ${pending.packageName} substituted"
-                        )
+                        }
                     }
                 }
             } catch (t: Throwable) {

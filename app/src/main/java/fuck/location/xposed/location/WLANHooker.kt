@@ -35,11 +35,6 @@ class WLANHooker {
         val loadWatchers = findAllMethods(clazz, findSuper = true) {
             name == "loadClassFromLoader" && isPrivate && isStatic
         }
-        Log.i(
-            "[WiFi] SystemServiceManager loader=${clazz.classLoader} " +
-                "loadWatchers=${loadWatchers.map { it.toGenericString() }} " +
-                "serviceLoader=$serviceLoader"
-        )
         if (loadWatchers.isEmpty() && serviceLoader == null) {
             // Not a missing method so much as a service that has not started.
             // loadClassFromLoader is gone from SystemServiceManager on current
@@ -158,10 +153,10 @@ class WLANHooker {
                 // construction differs on a vendor framework.
                 param.result = null
 
-                Log.i(
+                Log.d {
                     "[WiFi] in getScanResults for $packageName, reporting " +
                         "${profile.wifiAccessPoints.size} custom access point(s)"
-                )
+                }
 
                 val results = try {
                     profile.wifiAccessPoints.map { buildScanResult(it) }
@@ -205,10 +200,10 @@ class WLANHooker {
                 // same "not associated" state the framework uses.
                 val connected = profile.wifiAccessPoints.firstOrNull()
 
-                Log.i(
+                Log.d {
                     "[WiFi] in getConnectionInfo for $packageName, " +
                         "reporting ${connected?.ssid ?: "no association"}"
-                )
+                }
 
                 try {
                     val builder = WifiInfo.Builder()

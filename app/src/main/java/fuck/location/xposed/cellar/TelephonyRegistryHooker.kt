@@ -101,11 +101,7 @@ class TelephonyRegistryHooker {
                 ?.takeIf { it.describesCell }
         }
 
-        Log.i(
-            "[Cellar] TelephonyRegistry bound: records=${recordsField.name} " +
-                "notifications=${notifications.size} callbacks=location:${locationCallbacks.size}," +
-                "info:${infoCallbacks.size},display:${displayCallbacks.size}"
-        )
+        Log.i("[Cellar] TelephonyRegistry hooked on ${clazz.simpleName}.${recordsField.name}")
 
         hookBeforeOnce(locationCallbacks) { param ->
             val profile = spoofFor(param.thisObject) ?: return@hookBeforeOnce

@@ -56,10 +56,10 @@ class NetworkTypeHooker {
                         // distinguishes LTE from LTE_CA where the ROM does.
                         if (param.result == TelephonyManager.NETWORK_TYPE_LTE) return@after
 
-                        Log.i(
+                        Log.d {
                             "[Cellar] ${method.name} for $packageName: " +
                                 "${param.result} -> LTE"
-                        )
+                        }
                         param.result = TelephonyManager.NETWORK_TYPE_LTE
                     }
                 }

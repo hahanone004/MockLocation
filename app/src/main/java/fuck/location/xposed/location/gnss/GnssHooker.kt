@@ -62,7 +62,7 @@ class GnssHooker {
             ConfigGateway.get().locationSpoofFor(it) != null
         } ?: return
 
-        Log.i("disabling ${param.method.name} for $packageName")
+        Log.d { "disabling ${param.method.name} for $packageName" }
         val returnType = (param.method as Method).returnType
         param.result = if (returnType == Boolean::class.javaPrimitiveType) false else null
     }

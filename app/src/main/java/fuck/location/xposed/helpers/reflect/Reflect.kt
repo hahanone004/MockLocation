@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
+import fuck.location.BuildConfig
 import de.robv.android.xposed.callbacks.XCallback
 import java.lang.reflect.Field
 import java.lang.reflect.Member
@@ -203,7 +204,33 @@ fun runOnMainThread(action: () -> Unit) {
 object Log {
     var tag: String = "FuckLocation"
 
-    fun d(message: String) = write("D", message)
+    /**
+     * A release build says only what a user needs to answer "is this working".
+     *
+     * The tracing below is per call - a location fix, a scan, an IMEI read -
+     * and it names the values being substituted, so on a release build it is
+     * both a flood and a giveaway: anything that can read the system log could
+     * see the coordinates, the IMEI and the network names being reported, plus
+     * which apps they were reported to. Debug builds keep all of it, because
+     * that is what makes a ROM difference diagnosable.
+     *
+     * [i], [w] and [e] are written either way: they are the once-per-boot
+     * lifecycle, what got hooked, and what went wrong.
+     */
+    inline fun d(message: () -> String) {
+        if (BuildConfig.DEBUG) debug(message())
+    }
+
+    /**
+     * BuildConfig.DEBUG is a compile-time constant, so inlining [d] around it
+     * leaves a release build with nothing at all - not even the cost of
+     * building a message it was never going to print. These calls sit on hooks
+     * that run once per location fix and once per telephony read, where that
+     * is not free.
+     */
+    @PublishedApi
+    internal fun debug(message: String) = write("D", message)
+
     fun i(message: String) = write("I", message)
     fun w(message: String) = write("W", message)
     fun e(message: String, throwable: Throwable? = null) = write("E", message, throwable)

@@ -307,7 +307,7 @@ class ConfigGateway private constructor() {
         } catch (t: Throwable) {
             // Expected on any build where the impl class inherits the method,
             // so this is a debug line rather than a warning per query.
-            Log.d("AppGlobals cannot resolve packages for uid $uid: $t")
+            Log.d { "AppGlobals cannot resolve packages for uid $uid: $t" }
             emptyList()
         }
     }

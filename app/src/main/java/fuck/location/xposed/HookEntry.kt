@@ -78,7 +78,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
 
         when (lpparam.packageName) {
             BuildConfig.APPLICATION_ID -> {
-                Log.i("Try to hook the module")
+                Log.d { "Try to hook the module" }
                 val clazz = lpparam.classLoader.loadClass("fuck.location.app.ui.activities.MainActivity")
 
                 val activationMethods = findAllMethods(clazz, findSuper = true) {
@@ -89,7 +89,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 }
                 activationMethods.hookMethod {
                     after { param ->
-                        Log.i("Unlock the module")
+                        Log.d { "Unlock the module" }
                         param.result = true
                     }
                 }
@@ -145,7 +145,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
         if (process.isNullOrEmpty()) return true
         if (process.substringBefore(':') == lpparam.packageName) return true
 
-        Log.i("skipping ${lpparam.packageName} loaded into $process")
+        Log.d { "skipping ${lpparam.packageName} loaded into $process" }
         return false
     }
 
