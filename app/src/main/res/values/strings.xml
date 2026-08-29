@@ -73,13 +73,15 @@
     <string name="profile_default_name">Default</string>
     <string name="profile_migrated_name">Migrated settings</string>
     <string name="profile_assign_title">Profile for this app</string>
+    <string name="profile_does_nothing">%s \u00b7 spoofs nothing</string>
 
     <string name="card_title_not_activated">Not activated</string>
     <string name="card_detail_not_activated">Make sure you have correctly set up this module</string>
 
     <string name="card_title_activated">Activated</string>
     <string name="card_detail_activated">Go settings for further set up</string>
-    <string name="card_serve_time">Served for 0 times</string>
+    <string name="card_framework_ready">%1$d profile(s) spoofing \u00b7 %2$d app(s) assigned</string>
+    <string name="card_framework_missing">Not hooked into system_server \u2014 scope this module to System Framework in LSPosed and reboot</string>
 
     <string name="system_app">System apps</string>
 

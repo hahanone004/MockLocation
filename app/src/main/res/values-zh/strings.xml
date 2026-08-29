@@ -64,13 +64,15 @@
     <string name="profile_default_name">默认</string>
     <string name="profile_migrated_name">迁移的设置</string>
     <string name="profile_assign_title">为该应用选择配置</string>
+    <string name="profile_does_nothing">%s \u00b7 未开启伪装</string>
 
     <string name="card_title_not_activated">模块未激活</string>
     <string name="card_detail_not_activated">请检查你是否已经正确激活了模块</string>
 
     <string name="card_title_activated">模块已经激活</string>
     <string name="card_detail_activated">请前往“设置”以对模块进行进一步设定</string>
-    <string name="card_serve_time">已合计为您服务 0 次</string>
+    <string name="card_framework_ready">%1$d 个配置已开启伪装 \u00b7 %2$d 个应用已指派</string>
+    <string name="card_framework_missing">未接入系统框架 \u2014 请在 LSPosed 勾选「系统框架」作用域后重启</string>
 
     <string name="system_app">系统应用</string>
 

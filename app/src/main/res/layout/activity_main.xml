@@ -17,8 +17,16 @@
                 android:id="@+id/module_status_icon"
                 style="@style/DefaultImage" />
 
+            <!--
+                Weighted rather than match_parent: as match_parent it was as wide
+                as the whole card even though the icon sits beside it, so any
+                text long enough to wrap ran off the right edge.
+            -->
             <LinearLayout
                 style="@style/Default"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="16dp"
                 android:orientation="vertical"
                 android:paddingVertical="25dp">
 

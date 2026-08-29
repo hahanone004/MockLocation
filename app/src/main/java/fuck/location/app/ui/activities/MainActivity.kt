@@ -52,7 +52,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             binding.moduleStatusText.text = getString(R.string.card_title_activated)
             binding.serviceStatusText.text = getString(R.string.card_detail_activated)
 
-            binding.serveTimes.text = getString(R.string.card_serve_time)
+            binding.serveTimes.text = frameworkStatus()
         } else {
             binding.moduleStatusCard.setCardBackgroundColor(getColor(R.color.red_500))
             binding.moduleStatusIcon.setImageDrawable(AppCompatResources.getDrawable(this,
@@ -65,6 +65,26 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             binding.menuProfiles.visibility = View.GONE
             binding.menuLocationCredit.visibility = View.GONE
         }
+    }
+
+    /**
+     * What the framework half of the module is doing, which is the half the
+     * activation card cannot see: that card turns green because the module was
+     * loaded into this app, while every spoof lives in system_server and needs
+     * to be in the module's scope separately.
+     */
+    private fun frameworkStatus(): String {
+        if (!ConfigGateway.get().isFrameworkReachable()) {
+            return getString(R.string.card_framework_missing)
+        }
+
+        val store = ConfigGateway.get().readProfileStore()
+
+        return getString(
+            R.string.card_framework_ready,
+            store.profiles.count { !it.spoofsNothing },
+            store.assignments.size,
+        )
     }
 
     @Keep

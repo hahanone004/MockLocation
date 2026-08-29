@@ -97,6 +97,14 @@ data class Profile(
         return latitude to longitude
     }
 
+    /**
+     * True when the profile is assigned but substitutes nothing. Worth saying
+     * out loud in the UI: an app pointed at such a profile behaves exactly as
+     * if the module were not installed, which otherwise looks like a failure.
+     */
+    val spoofsNothing: Boolean
+        get() = !locationEnabled && !cellEnabled && !wifiEnabled && !simEnabled
+
     /** Upper 20 bits of the ECI: which base station. */
     val eNodeBId: Int get() = eci ushr 8
 

@@ -78,6 +78,10 @@ class ConfigGateway private constructor() {
         fun get(): ConfigGateway {
             return instance!!
         }
+
+        /** Keys that only a pre-profile config carries. */
+        private val LEGACY_KEYS =
+            setOf("x", "y", "offset", "eci", "pci", "tac", "earfcn", "bandwidth")
     }
 
     @ExperimentalStdlibApi
@@ -343,15 +347,39 @@ class ConfigGateway private constructor() {
         )
     }
 
+    /**
+     * Whether the hooks inside system_server are answering.
+     *
+     * The module being enabled in LSPosed only proves it reached this app - the
+     * spoofs live in system_server, which has to be in the module's scope
+     * separately, and the difference is invisible from here otherwise. The
+     * config travels over a framework method the module intercepts, so asking
+     * for it is itself the test: an unhooked getInstallerPackageName has never
+     * heard of this package name and answers null, or refuses outright.
+     */
+    fun isFrameworkReachable(): Boolean = try {
+        universalAPICaller("None", 4) is String
+    } catch (t: Throwable) {
+        Log.w("Framework side is not answering: $t")
+        false
+    }
+
     @ExperimentalStdlibApi
     fun readProfileStore(): ProfileStore {
         val now = SystemClock.elapsedRealtime()
         cachedStore?.let { if (now - cachedAt < cacheMillis) return it }
 
         val json = try {
-            universalAPICaller("None", 4) as String
+            // An unhooked getInstallerPackageName has never heard of this
+            // package name and answers null, so a null here means the framework
+            // half of the module is not running - which is worth naming in the
+            // log, since every spoof silently does nothing from then on.
+            universalAPICaller("None", 4) as? String
+                ?: throw IllegalStateException(
+                    "the framework side did not answer; is system_server in the module's scope?"
+                )
         } catch (e: Exception) {
-            Log.w("Failed to read profiles, falling back to defaults")
+            Log.w("Cannot read the config, so nothing will be spoofed: $e")
             EMPTY_CONFIG
         }
 
@@ -382,6 +410,12 @@ class ConfigGateway private constructor() {
             val storeAdapter: JsonAdapter<ProfileStore> = moshi.adapter()
             return storeAdapter.fromJson(json) ?: ProfileStore()
         }
+
+        // No config at all reads as "{}", which is not a legacy config: taking
+        // it for one built a profile out of nothing but defaults and switched
+        // its spoofs on, so a device with no config yet reported 0, 0 to every
+        // app the module could see.
+        if (raw.keys.none { it in LEGACY_KEYS }) return ProfileStore()
 
         val legacyAdapter: JsonAdapter<LegacyFakeLocation> = moshi.adapter()
         val legacy = legacyAdapter.fromJson(json) ?: return ProfileStore()

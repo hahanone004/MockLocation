@@ -2,6 +2,7 @@ package fuck.location
 
 import fuck.location.app.ui.models.Profile
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import kotlin.math.PI
@@ -96,5 +97,18 @@ class ProfileTest {
         assertEquals("", Profile(mcc = "466").operatorNumeric)
         assertEquals("", Profile(mnc = "92").operatorNumeric)
         assertEquals("", Profile().operatorNumeric)
+    }
+
+    @Test
+    fun `a profile substitutes nothing until one of its switches is on`() {
+        assertTrue(Profile().spoofsNothing)
+
+        // Coordinates alone change nothing, which is what the label has to say.
+        assertTrue(Profile(x = 24.9581, y = 121.2198).spoofsNothing)
+
+        assertFalse(Profile(locationEnabled = true).spoofsNothing)
+        assertFalse(Profile(cellEnabled = true).spoofsNothing)
+        assertFalse(Profile(wifiEnabled = true).spoofsNothing)
+        assertFalse(Profile(simEnabled = true).spoofsNothing)
     }
 }

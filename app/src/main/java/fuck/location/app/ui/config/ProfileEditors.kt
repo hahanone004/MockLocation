@@ -289,11 +289,13 @@ object ProfileEditors {
         val store = ConfigGateway.get().readProfileStore()
 
         val labels = store.profiles.map { profile ->
-            if (profile.id == store.defaultProfileId) {
+            val name = if (profile.id == store.defaultProfileId) {
                 context.getString(R.string.profile_label_default, profile.displayName(context))
             } else {
                 profile.displayName(context)
             }
+
+            profile.qualified(context, name)
         } + context.getString(R.string.profile_action_new)
 
         MaterialDialog(context).show {
@@ -440,8 +442,8 @@ object ProfileEditors {
             context.getString(
                 R.string.profile_assign_follow_default,
                 default?.displayName(context) ?: context.getString(R.string.profile_unnamed),
-            ),
-        ) + store.profiles.map { it.displayName(context) }
+            ).let { default?.qualified(context, it) ?: it },
+        ) + store.profiles.map { it.qualified(context, it.displayName(context)) }
 
         MaterialDialog(context).show {
             title(R.string.profile_assign_title)
@@ -459,15 +461,16 @@ object ProfileEditors {
 
     /** How an app's assignment reads in the app list. */
     fun assignmentLabel(context: Context, store: ProfileStore, packageName: String): String {
+        val default = store.defaultProfile()
         val followDefault = context.getString(
             R.string.profile_assign_follow_default,
-            store.defaultProfile()?.displayName(context)
-                ?: context.getString(R.string.profile_unnamed),
-        )
+            default?.displayName(context) ?: context.getString(R.string.profile_unnamed),
+        ).let { default?.qualified(context, it) ?: it }
 
         val assigned = store.assignments[packageName] ?: return followDefault
 
-        return store.profiles.firstOrNull { it.id == assigned }?.displayName(context)
+        return store.profiles.firstOrNull { it.id == assigned }
+            ?.let { it.qualified(context, it.displayName(context)) }
             ?: followDefault
     }
 
@@ -539,6 +542,14 @@ object ProfileEditors {
 
     private fun Profile.displayName(context: Context): String =
         name.ifBlank { context.getString(R.string.profile_unnamed) }
+
+    /**
+     * Marks a profile that has every switch off. An app assigned to one behaves
+     * as though the module were not installed, which is otherwise impossible to
+     * tell apart from the module being broken.
+     */
+    private fun Profile.qualified(context: Context, label: String): String =
+        if (spoofsNothing) context.getString(R.string.profile_does_nothing, label) else label
 
     private fun View.text(id: Int): String =
         findViewById<EditText>(id).text.toString().trim()
