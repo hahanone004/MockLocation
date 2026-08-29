@@ -20,16 +20,13 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         super.onCreate(savedInstanceState)
 
         ConfigGateway.get().setCustomContext(applicationContext)
-        ConfigGateway.get().migrateWhitelistIfNeeded()
+        ConfigGateway.get().migrateWhitelistIfNeeded(this)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setModuleState(binding)
 
         binding.menuLocationCredit.setOnClickListener(this)
         binding.menuProfiles.setOnClickListener(this)
-        binding.menuLocationSpoof.setOnClickListener(this)
-        binding.menuCellSpoof.setOnClickListener(this)
-        binding.menuWifiSpoof.setOnClickListener(this)
         binding.menuAbout.setOnClickListener(this)
 
         setContentView(binding.root)
@@ -39,21 +36,10 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
     override fun onClick(v: View) {
         when (v.id) {
             R.id.menu_location_credit -> startActivity(Intent(this, ModuleActivity::class.java))
+            // The default profile is edited through the profile list like any
+            // other, so there is nothing here duplicating it.
             R.id.menu_profiles -> ProfileEditors.manageProfiles(this)
             R.id.menu_about -> startActivity(Intent(this, AboutActivity::class.java))
-
-            // The three feature entries edit whichever profile is the default;
-            // each editor carries that profile's switch for its own feature.
-            else -> {
-                val defaultProfileId =
-                    ConfigGateway.get().readProfileStore().defaultProfile()?.id ?: return
-
-                when (v.id) {
-                    R.id.menu_location_spoof -> ProfileEditors.editLocation(this, defaultProfileId)
-                    R.id.menu_cell_spoof -> ProfileEditors.editCell(this, defaultProfileId)
-                    R.id.menu_wifi_spoof -> ProfileEditors.editWifi(this, defaultProfileId)
-                }
-            }
         }
     }
 
@@ -78,9 +64,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
             binding.menuProfiles.visibility = View.GONE
             binding.menuLocationCredit.visibility = View.GONE
-            binding.menuLocationSpoof.visibility = View.GONE
-            binding.menuCellSpoof.visibility = View.GONE
-            binding.menuWifiSpoof.visibility = View.GONE
         }
     }
 

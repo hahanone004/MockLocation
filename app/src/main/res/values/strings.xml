@@ -53,8 +53,9 @@
     <string name="profile_unnamed">Unnamed profile</string>
     <string name="profile_delete_last">This is the only profile left, so it cannot be deleted.</string>
     <string name="profile_delete_confirm">Apps assigned to this profile go back to the default.</string>
-    <string name="profile_assign_none">Not spoofed</string>
     <string name="profile_assign_follow_default">Default (%s)</string>
+    <string name="profile_default_name">Default</string>
+    <string name="profile_migrated_name">Migrated settings</string>
     <string name="profile_assign_title">Profile for this app</string>
 
     <string name="card_title_not_activated">Not activated</string>

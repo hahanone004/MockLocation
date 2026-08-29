@@ -182,7 +182,13 @@ object ProfileEditors {
                 if (name.isEmpty()) return@input
 
                 val store = ConfigGateway.get().readProfileStore()
-                val created = Profile(id = UUID.randomUUID().toString(), name = name)
+                val created = Profile(
+                    id = UUID.randomUUID().toString(),
+                    name = name,
+                    locationEnabled = true,
+                    cellEnabled = true,
+                    wifiEnabled = true,
+                )
 
                 ConfigGateway.get().writeProfileStore(
                     store.copy(profiles = store.profiles + created)
@@ -297,7 +303,6 @@ object ProfileEditors {
         val default = store.defaultProfile()
 
         val labels = listOf(
-            context.getString(R.string.profile_assign_none),
             context.getString(
                 R.string.profile_assign_follow_default,
                 default?.displayName(context) ?: context.getString(R.string.profile_unnamed),
@@ -307,11 +312,10 @@ object ProfileEditors {
         MaterialDialog(context).show {
             title(R.string.profile_assign_title)
             listItems(items = labels) { _, index, _ ->
-                val assignments = when (index) {
-                    0 -> store.assignments - packageName
-                    1 -> store.assignments + (packageName to ProfileStore.FOLLOW_DEFAULT)
-                    else -> store.assignments + (packageName to store.profiles[index - 2].id)
-                }
+                // Following the default is the absence of an assignment, so
+                // picking it drops the entry rather than storing a sentinel.
+                val assignments = if (index == 0) store.assignments - packageName
+                else store.assignments + (packageName to store.profiles[index - 1].id)
 
                 ConfigGateway.get().writeProfileStore(store.copy(assignments = assignments))
                 onChanged()
@@ -320,17 +324,18 @@ object ProfileEditors {
     }
 
     /** How an app's assignment reads in the app list. */
-    fun assignmentLabel(context: Context, store: ProfileStore, packageName: String): String =
-        when (val assigned = store.assignments[packageName]) {
-            null -> context.getString(R.string.profile_assign_none)
-            ProfileStore.FOLLOW_DEFAULT -> context.getString(
-                R.string.profile_assign_follow_default,
-                store.defaultProfile()?.displayName(context)
-                    ?: context.getString(R.string.profile_unnamed),
-            )
-            else -> store.profiles.firstOrNull { it.id == assigned }?.displayName(context)
-                ?: context.getString(R.string.profile_assign_none)
-        }
+    fun assignmentLabel(context: Context, store: ProfileStore, packageName: String): String {
+        val followDefault = context.getString(
+            R.string.profile_assign_follow_default,
+            store.defaultProfile()?.displayName(context)
+                ?: context.getString(R.string.profile_unnamed),
+        )
+
+        val assigned = store.assignments[packageName] ?: return followDefault
+
+        return store.profiles.firstOrNull { it.id == assigned }?.displayName(context)
+            ?: followDefault
+    }
 
     // endregion
 

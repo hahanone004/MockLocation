@@ -4,6 +4,7 @@ import fuck.location.app.ui.models.LegacyFakeLocation
 import fuck.location.app.ui.models.Profile
 import fuck.location.app.ui.models.ProfileStore
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -16,10 +17,7 @@ class ProfileStoreTest {
     private val store = ProfileStore(
         profiles = listOf(taipei, shanghai),
         defaultProfileId = "taipei",
-        assignments = mapOf(
-            "com.example.mapped" to "shanghai",
-            "com.example.follower" to ProfileStore.FOLLOW_DEFAULT,
-        ),
+        assignments = mapOf("com.example.mapped" to "shanghai"),
     )
 
     @Test
@@ -28,22 +26,26 @@ class ProfileStoreTest {
     }
 
     @Test
-    fun `an app following the default gets the default profile`() {
-        assertEquals(taipei, store.profileFor("com.example.follower"))
+    fun `an unassigned app follows the default`() {
+        assertEquals(taipei, store.profileFor("com.example.other"))
     }
 
     @Test
-    fun `a follower tracks the default when it moves`() {
+    fun `an unassigned app tracks the default when it moves`() {
         val moved = store.copy(defaultProfileId = "shanghai")
 
-        assertEquals(shanghai, moved.profileFor("com.example.follower"))
+        assertEquals(shanghai, moved.profileFor("com.example.other"))
     }
 
     @Test
-    fun `an app that was never assigned is left alone`() {
-        // Assignment is the only gate, so an untouched app must never be
-        // spoofed just because a default profile exists.
-        assertNull(store.profileFor("com.example.untouched"))
+    fun `a fresh store spoofs nothing until a switch is turned on`() {
+        // Everything follows the default, so the profile a fresh install ships
+        // with has to leave all three off or the whole device gets spoofed.
+        val shipped = ProfileStore().profileFor("com.example.other")!!
+
+        assertFalse(shipped.locationEnabled)
+        assertFalse(shipped.cellEnabled)
+        assertFalse(shipped.wifiEnabled)
     }
 
     @Test
@@ -57,17 +59,12 @@ class ProfileStoreTest {
     fun `a dangling default id falls back to the first profile`() {
         val broken = store.copy(defaultProfileId = "gone")
 
-        assertEquals(taipei, broken.profileFor("com.example.follower"))
+        assertEquals(taipei, broken.profileFor("com.example.other"))
     }
 
     @Test
     fun `an empty store resolves to nothing rather than throwing`() {
-        val empty = ProfileStore(
-            profiles = emptyList(),
-            assignments = mapOf("com.example.follower" to ProfileStore.FOLLOW_DEFAULT),
-        )
-
-        assertNull(empty.profileFor("com.example.follower"))
+        assertNull(ProfileStore(profiles = emptyList()).profileFor("com.example.other"))
     }
 
     @Test
@@ -93,6 +90,17 @@ class ProfileStoreTest {
             migrated.defaultProfile()!!.offset,
             1e-6,
         )
+    }
+
+    @Test
+    fun `a legacy profile keeps its spoofs switched on`() {
+        // The user had them configured and in use; the migration decides which
+        // apps the profile applies to, not whether it does anything.
+        val profile = ProfileStore.fromLegacy(LegacyFakeLocation()).defaultProfile()!!
+
+        assertTrue(profile.locationEnabled)
+        assertTrue(profile.cellEnabled)
+        assertTrue(profile.wifiEnabled)
     }
 
     @Test

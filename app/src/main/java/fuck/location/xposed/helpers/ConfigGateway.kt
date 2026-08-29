@@ -13,6 +13,7 @@ import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
+import fuck.location.R
 import fuck.location.app.ui.models.LegacyFakeLocation
 import fuck.location.app.ui.models.Profile
 import fuck.location.app.ui.models.ProfileStore
@@ -22,6 +23,7 @@ import java.io.FileNotFoundException
 import java.lang.Exception
 import java.lang.IllegalArgumentException
 import java.lang.reflect.Field
+import java.util.UUID
 
 /*
  * This hook acts as a gateway from phone to framework
@@ -262,18 +264,19 @@ class ConfigGateway private constructor() {
     }
 
     /**
-     * Folds a pre-version-4 whitelist into the assignment map, once.
+     * Brings a pre-version-4 config forward, once.
      *
-     * Interception used to need an app to be both whitelisted and assigned a
-     * profile, which meant assigning one to an unticked app silently did
-     * nothing. Assignment is now the only gate, so every previously whitelisted
-     * app becomes one that follows the default profile - the behaviour it
-     * already had.
+     * Before profiles, an app was spoofed only if it was on a whitelist. Apps
+     * now follow the default profile unless assigned otherwise, so migrating
+     * has to keep both halves of that: the previously whitelisted apps go on
+     * spoofing, and every other app goes on being left alone. That needs two
+     * profiles - the old settings, switched on and assigned to those apps, and
+     * a switched-off default for everyone else.
      *
-     * Call from the app, not from a hook: it writes.
+     * Call from the app, not from a hook: it writes, and it needs resources.
      */
     @ExperimentalStdlibApi
-    fun migrateWhitelistIfNeeded() {
+    fun migrateWhitelistIfNeeded(context: Context) {
         val store = readProfileStore()
         if (store.configVersion >= ProfileStore.CURRENT_CONFIG_VERSION) return
 
@@ -284,13 +287,41 @@ class ConfigGateway private constructor() {
             emptyList()
         }
 
+        if (whitelisted.isEmpty()) {
+            // Nothing was being spoofed, so keep the settings but leave every
+            // switch off rather than turning the whole device on at once.
+            Log.i("Migrating a config with an empty whitelist")
+
+            writeProfileStore(
+                store.copy(
+                    profiles = store.profiles.map {
+                        it.copy(locationEnabled = false, cellEnabled = false, wifiEnabled = false)
+                    },
+                    configVersion = ProfileStore.CURRENT_CONFIG_VERSION,
+                )
+            )
+            return
+        }
+
         Log.i("Folding ${whitelisted.size} whitelisted package(s) into assignments")
 
+        val carried = (store.defaultProfile() ?: Profile()).copy(
+            id = UUID.randomUUID().toString(),
+            name = context.getString(R.string.profile_migrated_name),
+            locationEnabled = true,
+            cellEnabled = true,
+            wifiEnabled = true,
+        )
+        val untouched = Profile(
+            id = Profile.DEFAULT_ID,
+            name = context.getString(R.string.profile_default_name),
+        )
+
         writeProfileStore(
-            store.copy(
-                // Anything already assigned wins; this only fills the gaps.
-                assignments = whitelisted.associateWith { ProfileStore.FOLLOW_DEFAULT } +
-                    store.assignments,
+            ProfileStore(
+                profiles = listOf(untouched, carried),
+                defaultProfileId = untouched.id,
+                assignments = whitelisted.associateWith { carried.id },
                 configVersion = ProfileStore.CURRENT_CONFIG_VERSION,
             )
         )

@@ -112,71 +112,8 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/menu_location_spoof"
-                style="@style/DefaultCard"
-                app:cardElevation="0dp">
 
-                <LinearLayout
-                    style="@style/Default"
-                    android:orientation="horizontal">
 
-                    <ImageView
-                        style="@style/DefaultImage"
-                        android:src="@drawable/baseline_my_location_24" />
-
-                    <TextView
-                        style="@style/DefaultText.Option.Card"
-                        android:layout_width="wrap_content"
-                        android:gravity="center_vertical"
-                        android:text="@string/title_location_spoof" />
-
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/menu_cell_spoof"
-                style="@style/DefaultCard"
-                app:cardElevation="0dp">
-
-                <LinearLayout
-                    style="@style/Default"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        style="@style/DefaultImage"
-                        android:src="@drawable/baseline_cell_tower_24" />
-
-                    <TextView
-                        style="@style/DefaultText.Option.Card"
-                        android:layout_width="wrap_content"
-                        android:gravity="center_vertical"
-                        android:text="@string/title_cell_spoof" />
-
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
-
-            <com.google.android.material.card.MaterialCardView
-                android:id="@+id/menu_wifi_spoof"
-                style="@style/DefaultCard"
-                app:cardElevation="0dp">
-
-                <LinearLayout
-                    style="@style/Default"
-                    android:orientation="horizontal">
-
-                    <ImageView
-                        style="@style/DefaultImage"
-                        android:src="@drawable/baseline_wifi_24" />
-
-                    <TextView
-                        style="@style/DefaultText.Option.Card"
-                        android:layout_width="wrap_content"
-                        android:gravity="center_vertical"
-                        android:text="@string/title_wifi_spoof" />
-
-                </LinearLayout>
-            </com.google.android.material.card.MaterialCardView>
 
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/menu_about"

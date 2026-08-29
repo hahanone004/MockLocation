@@ -44,8 +44,9 @@
     <string name="profile_unnamed">未命名配置</string>
     <string name="profile_delete_last">只剩这一个配置了，不能删除。</string>
     <string name="profile_delete_confirm">指派到该配置的应用会回到默认配置。</string>
-    <string name="profile_assign_none">不伪装</string>
     <string name="profile_assign_follow_default">跟随默认（%s）</string>
+    <string name="profile_default_name">默认</string>
+    <string name="profile_migrated_name">迁移的设置</string>
     <string name="profile_assign_title">为该应用选择配置</string>
 
     <string name="card_title_not_activated">模块未激活</string>

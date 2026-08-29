@@ -21,10 +21,17 @@ data class Profile(
     val id: String = DEFAULT_ID,
     val name: String = "",
 
-    /** Each spoof is switched on independently within the profile. */
-    val locationEnabled: Boolean = true,
-    val cellEnabled: Boolean = true,
-    val wifiEnabled: Boolean = true,
+    /**
+     * Each spoof is switched on independently within the profile.
+     *
+     * Off by default: an app with no assignment of its own follows the default
+     * profile, so a freshly installed module that shipped these on would spoof
+     * every app on the device with a position of 0, 0. Profiles the user
+     * creates deliberately are switched on at creation instead.
+     */
+    val locationEnabled: Boolean = false,
+    val cellEnabled: Boolean = false,
+    val wifiEnabled: Boolean = false,
 
     /** Latitude of the cell, and the position GPS reports. */
     val x: Double = 0.0,

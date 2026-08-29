@@ -11,9 +11,9 @@ data class ProfileStore(
     val profiles: List<Profile> = listOf(Profile(id = Profile.DEFAULT_ID)),
     val defaultProfileId: String = Profile.DEFAULT_ID,
     /**
-     * Package name to profile id, or to [FOLLOW_DEFAULT]. An app that is absent
-     * is not intercepted at all, which is why this is the only gate: an app the
-     * user has never touched must never be spoofed.
+     * Package name to profile id, recording only the apps that deviate. An app
+     * that is absent follows the default profile, so the default really is the
+     * default rather than a value only some apps see.
      */
     val assignments: Map<String, String> = emptyMap(),
     val configVersion: Int = CURRENT_CONFIG_VERSION,
@@ -25,8 +25,7 @@ data class ProfileStore(
      * default id is dangling too, so a half-edited config still works.
      */
     fun profileFor(packageName: String): Profile? {
-        val assigned = assignments[packageName] ?: return null
-        if (assigned == FOLLOW_DEFAULT) return defaultProfile()
+        val assigned = assignments[packageName] ?: return defaultProfile()
 
         return profiles.firstOrNull { it.id == assigned } ?: defaultProfile()
     }
@@ -36,16 +35,11 @@ data class ProfileStore(
 
     companion object {
         /**
-         * Assignment value meaning "whatever the default profile is", so an app
-         * tracks the default instead of pinning the profile it happens to be.
-         */
-        const val FOLLOW_DEFAULT = "@default"
-
-        /**
          * 1: a bare {x, y} object.
          * 2: one flat object, offset in degrees, plus the LTE identity fields.
          * 3: named profiles, offset as a radius in metres, MCC/MNC and Wi-Fi.
-         * 4: assignments replace the separate whitelist.
+         * 4: assignments replace the separate whitelist and only record apps
+         *    that deviate from the default.
          */
         const val CURRENT_CONFIG_VERSION = 4
 
@@ -67,6 +61,11 @@ data class ProfileStore(
                     pci = legacy.pci,
                     earfcn = legacy.earfcn,
                     bandwidth = legacy.bandwidth,
+                    // The user had these configured and in use, so carry that
+                    // over; the migration decides who the profile applies to.
+                    locationEnabled = true,
+                    cellEnabled = true,
+                    wifiEnabled = true,
                 )
             ),
             // Left at 3 so the whitelist is still folded into assignments.
