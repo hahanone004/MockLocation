@@ -16,6 +16,7 @@ import fuck.location.xposed.helpers.ConfigGateway
 import fuck.location.xposed.location.LocationHooker
 import fuck.location.xposed.location.WLANHooker
 import fuck.location.xposed.location.gnss.GnssHooker
+import java.util.concurrent.atomic.AtomicBoolean
 
 @ExperimentalStdlibApi
 class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
@@ -109,10 +110,13 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
      * Everything that lives in system_server. Reachable two ways, so it is
      * guarded: whichever arrives first does the work.
      */
-    @Synchronized
     private fun hookSystemServer(classLoader: ClassLoader) {
-        if (systemServerHooked) return
-        systemServerHooked = true
+        // A framework that both runs initZygote in system_server and dispatches
+        // handleLoadPackage for it would otherwise install everything twice,
+        // and a doubled onReportLocation hook would swap the registration map
+        // out from under its own copy. Compare-and-set rather than a plain flag
+        // because the two entry points need not share an instance, or a thread.
+        if (!systemServerHooked.compareAndSet(false, true)) return
 
         Log.tag = "FuckLocation"
         Log.i("hooking system_server, API ${Build.VERSION.SDK_INT}")
@@ -162,7 +166,6 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
          */
         const val SYSTEM_SERVER_PROBE = "com.android.server.am.ActivityManagerService"
 
-        @Volatile
-        var systemServerHooked = false
+        val systemServerHooked = AtomicBoolean(false)
     }
 }
