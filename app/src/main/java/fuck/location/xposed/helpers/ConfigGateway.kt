@@ -24,6 +24,7 @@ import java.lang.Exception
 import java.lang.IllegalArgumentException
 import java.lang.reflect.Field
 import java.util.UUID
+import java.util.concurrent.ConcurrentHashMap
 
 /*
  * This hook acts as a gateway from phone to framework
@@ -52,6 +53,9 @@ class ConfigGateway private constructor() {
     private val cacheMillis = 2_000L
     private var cachedStore: ProfileStore? = null
     private var cachedAt = 0L
+
+    /** Last logged resolution per package; hooks resolve from many threads. */
+    private val announced = ConcurrentHashMap<String, String>()
 
     /* For getting started in framework. In default, it judges whether a
      * packageName is in whiteList.json or not.
@@ -250,8 +254,36 @@ class ConfigGateway private constructor() {
      */
 
     @ExperimentalStdlibApi
-    fun profileFor(packageName: String): Profile? =
-        readProfileStore().profileFor(packageName.substringBefore(':'))
+    fun profileFor(packageName: String): Profile? {
+        val app = packageName.substringBefore(':')
+        val profile = readProfileStore().profileFor(app)
+
+        announce(app, profile)
+        return profile
+    }
+
+    /**
+     * Says which profile an app resolved to, and what that profile actually
+     * has switched on.
+     *
+     * Without this the log is only ever half a sentence: every hook announces
+     * that it was reached and then says nothing at all when it decides to
+     * substitute nothing, so "not configured" and "broken" read identically.
+     * Only printed when the answer for an app changes, which keeps it to a
+     * line or two per app rather than one per location fix.
+     */
+    @ExperimentalStdlibApi
+    private fun announce(packageName: String, profile: Profile?) {
+        val decision = profile?.let {
+            "${it.name.ifBlank { it.id }} (location=${it.locationEnabled}" +
+                " cell=${it.cellEnabled} wifi=${it.wifiEnabled} sim=${it.simEnabled}" +
+                " language=${it.localeEnabled})"
+        } ?: "no profile"
+
+        if (announced.put(packageName, decision) != decision) {
+            Log.i("$packageName -> $decision")
+        }
+    }
 
     @ExperimentalStdlibApi
     fun locationSpoofFor(packageName: String): Profile? =
