@@ -93,7 +93,15 @@ data class Profile(
         nowMillis: Long = System.nanoTime() / 1_000_000L,
     ): Pair<Double, Double> {
         val baseLatitude = x.takeIf { it.isFinite() }?.coerceIn(-90.0, 90.0) ?: 0.0
-        val baseLongitude = normalizeLongitude(y.takeIf { it.isFinite() } ?: 0.0)
+        val finiteLongitude = y.takeIf { it.isFinite() } ?: 0.0
+        // Keep an already-valid value bit-for-bit intact. Running every value
+        // through modulo arithmetic introduces a tiny rounding change even
+        // when offset is zero, so an exact configured fix stops being exact.
+        val baseLongitude = if (finiteLongitude in -180.0..180.0) {
+            finiteLongitude
+        } else {
+            normalizeLongitude(finiteLongitude)
+        }
         val safeOffset = offset.takeIf { it.isFinite() && it > 0.0 } ?: 0.0
         if (safeOffset == 0.0) return baseLatitude to baseLongitude
 
