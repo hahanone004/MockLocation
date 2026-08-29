@@ -63,7 +63,9 @@ jobs:
           apk=$(find app/build/outputs/apk/release -maxdepth 1 -type f -name '*.apk' | head -n 1)
           test -n "$apk"
           echo "Release APK: $apk"
-          apksigner verify --verbose "$apk"
+          signer=$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -type f -name apksigner 2>/dev/null | sort -V | tail -n 1)
+          test -x "$signer"
+          "$signer" verify --verbose "$apk"
 
       # Downloading run logs needs admin rights on the repository, so put the
       # compiler output where anyone looking at the run can read it.
