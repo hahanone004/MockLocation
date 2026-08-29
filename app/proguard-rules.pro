@@ -12,8 +12,8 @@
 #   public *;
 #}
 
--keep class fuck.location.xposed.HookEntry{*;}
--keepnames class fuck.location.xposed.HookEntry
+-keep class mock.location.xposed.HookEntry{*;}
+-keepnames class mock.location.xposed.HookEntry
 -keep class de.robv.android.xposed.**{*;}
 -keepnames class de.robv.android.xposed.**
 

@@ -2,11 +2,11 @@
 <resources>
     <string name="config_save_failed">Could not save: System Framework is not connected</string>
     <string name="cell_config_invalid">Invalid cell configuration. Check MCC, MNC and LTE value ranges.</string>
-    <string name="app_name">Fuck Location</string>
+    <string name="app_name">Mock Location</string>
     <string name="select_apps_activity_title">Select Apps</string>
 
-    <string name="title_fucklocation_credit">Location whitelist</string>
-    <string name="title_fucklocation_about">About this app</string>
+    <string name="title_mocklocation_credit">Location whitelist</string>
+    <string name="title_mocklocation_about">About this app</string>
 
     <string name="title_profiles">Profiles</string>
     <string name="title_location_spoof">Location</string>
@@ -98,7 +98,7 @@
     <string name="card_framework_missing">Not hooked into system_server \u2014 scope this module to System Framework in LSPosed and reboot</string>
 
 
-    <string name="about_slogan">Fuck Location</string>
+    <string name="about_slogan">Mock Location</string>
     <string name="about_summary_title">About</string>
     <string name="about_summary_content">This app provides configurable location, cellular, Wi-Fi, SIM identity, and language information to selected apps through the Xposed framework.</string>
     <string name="about_usage_title">Getting started</string>

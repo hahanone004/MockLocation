@@ -1,9 +1,9 @@
-# FuckLocation
+# MockLocation
 
-FuckLocation 是一个基于 Xposed 的设备信息模拟模块。你可以为不同应用创建独立配置，
+MockLocation 是一个基于 Xposed 的设备信息模拟模块。你可以为不同应用创建独立配置，
 按需模拟位置、基站、Wi‑Fi、SIM 身份和系统语言。
 
-FuckLocation is an Xposed-based device information spoofing module. Create separate
+MockLocation is an Xposed-based device information spoofing module. Create separate
 profiles for different apps and choose which location, cellular, Wi‑Fi, SIM, and language
 information each app should receive.
 

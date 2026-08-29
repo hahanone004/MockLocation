@@ -11,12 +11,12 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.FuckLocation"
+        android:theme="@style/Theme.MockLocation"
 
         tools:replace="android:icon">
         <activity
-            android:name="fuck.location.app.ui.activities.MainActivity"
-            android:theme="@style/Theme.FuckLocation.NoActionBar"
+            android:name="mock.location.app.ui.activities.MainActivity"
+            android:theme="@style/Theme.MockLocation.NoActionBar"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -27,11 +27,11 @@
 
         <activity android:name=".app.ui.activities.ModuleActivity"
             android:parentActivityName=".app.ui.activities.MainActivity"
-            android:theme="@style/Theme.FuckLocation.NoActionBar"
+            android:theme="@style/Theme.MockLocation.NoActionBar"
             android:label="@string/select_apps_activity_title"/>
 
         <activity android:name=".app.ui.activities.AboutActivity"
-            android:theme="@style/Theme.FuckLocation.about"/>
+            android:theme="@style/Theme.MockLocation.about"/>
 
         <meta-data
             android:name="xposedmodule"

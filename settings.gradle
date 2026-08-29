@@ -8,5 +8,5 @@ dependencyResolutionManagement {
         maven { url "https://api.xposed.info/" }
     }
 }
-rootProject.name = "FuckLocation"
+rootProject.name = "MockLocation"
 include ':app'

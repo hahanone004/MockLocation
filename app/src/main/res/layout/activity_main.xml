@@ -2,7 +2,7 @@
 <!--
     The toolbar belongs to the layout, not to the window decoration: as a decor
     action bar it was drawn over the top of the content, so the status card sat
-    behind the "Fuck Location" title bar.
+    behind the "Mock Location" title bar.
 -->
 <androidx.coordinatorlayout.widget.CoordinatorLayout
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -113,7 +113,7 @@
                             style="@style/DefaultText.Option.Card"
                             android:layout_width="wrap_content"
                             android:gravity="center_vertical"
-                            android:text="@string/title_fucklocation_credit" />
+                            android:text="@string/title_mocklocation_credit" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
 
@@ -158,7 +158,7 @@
                             style="@style/DefaultText.Option.Card"
                             android:layout_width="wrap_content"
                             android:gravity="center_vertical"
-                            android:text="@string/title_fucklocation_about" />
+                            android:text="@string/title_mocklocation_about" />
                     </LinearLayout>
                 </com.google.android.material.card.MaterialCardView>
             </LinearLayout>

@@ -1,11 +1,11 @@
 <resources>
     <string name="config_save_failed">保存失败：未连接到系统框架</string>
     <string name="cell_config_invalid">基站配置无效，请检查 MCC、MNC 和 LTE 参数范围</string>
-    <string name="app_name">Fuck Location</string>
+    <string name="app_name">Mock Location</string>
     <string name="select_apps_activity_title">选择应用</string>
 
-    <string name="title_fucklocation_credit">位置白名单</string>
-    <string name="title_fucklocation_about">关于该应用</string>
+    <string name="title_mocklocation_credit">位置白名单</string>
+    <string name="title_mocklocation_about">关于该应用</string>
 
     <string name="title_profiles">配置管理</string>
     <string name="title_location_spoof">位置伪装</string>
@@ -89,7 +89,7 @@
     <string name="card_framework_missing">未接入系统框架 \u2014 请在 LSPosed 勾选「系统框架」作用域后重启</string>
 
 
-    <string name="about_slogan">Fuck Location</string>
+    <string name="about_slogan">Mock Location</string>
     <string name="about_summary_title">应用介绍</string>
     <string name="about_summary_content">本应用通过 Xposed 框架，为指定应用提供可配置的位置、基站、Wi-Fi、SIM 身份和系统语言信息。</string>
     <string name="about_usage_title">使用说明</string>
