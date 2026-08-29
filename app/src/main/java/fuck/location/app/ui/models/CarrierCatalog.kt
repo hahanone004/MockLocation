@@ -43,6 +43,10 @@ object CarrierCatalog {
         val callingCode: String,
         /** Total digits in a national mobile number, leading trunk zero included. */
         val numberLength: Int,
+        /** BCP-47 tag a phone sold in this country would be set to. */
+        val locale: String,
+        /** How that language reads in a picker. */
+        val localeLabel: String,
         val label: String,
         val carriers: List<Carrier>,
     )
@@ -55,6 +59,8 @@ object CarrierCatalog {
         mcc = "466",
         callingCode = "886",
         numberLength = 10,
+        locale = "zh-TW",
+        localeLabel = "繁體中文 (zh-TW)",
         label = "台灣 Taiwan",
         carriers = listOf(
             Carrier(

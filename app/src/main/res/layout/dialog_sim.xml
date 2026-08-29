@@ -36,6 +36,13 @@
         android:paddingTop="8dp"
         android:paddingBottom="8dp" />
 
+    <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switch_locale_enabled"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:textSize="16sp" />
+
     <TextView style="@style/FieldLabel" android:text="@string/sim_generated_title" />
 
     <TextView
@@ -67,6 +74,10 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp"
         android:text="@string/action_regenerate" />
+
+    <TextView
+        style="@style/FieldLabel"
+        android:text="@string/sim_locale_hint" />
 
     <TextView
         style="@style/FieldLabel"

@@ -188,13 +188,21 @@ object ProfileEditors {
             val number = view.findViewById<EditText>(R.id.field_phone_number)
             val serial = view.findViewById<EditText>(R.id.field_sim_serial)
 
+            val localeSwitch = view.findViewById<SwitchMaterial>(R.id.switch_locale_enabled)
+
             view.findViewById<SwitchMaterial>(R.id.switch_sim_enabled).isChecked = profile.simEnabled
+            localeSwitch.isChecked = profile.localeEnabled
             number.setText(profile.phoneNumber)
             serial.setText(profile.simSerial)
 
             fun render() {
                 countryRow.text = country.label
                 carrierRow.text = carrier?.label ?: context.getString(R.string.sim_carrier_unset)
+
+                // Named rather than left generic: which language the app will
+                // start rendering in is the whole decision being made here.
+                localeSwitch.text = context.getString(
+                    R.string.switch_enable_locale, country.localeLabel)
                 summary.text = carrier?.let {
                     context.getString(
                         R.string.sim_summary_format,
@@ -266,6 +274,8 @@ object ProfileEditors {
                             simOperatorName = picked?.operatorName ?: "",
                             phoneNumber = fields.text(R.id.field_phone_number),
                             simSerial = fields.text(R.id.field_sim_serial),
+                            localeEnabled = fields.switched(R.id.switch_locale_enabled),
+                            localeTag = country.locale,
                             // The cell identity describes the same network, so
                             // the carrier decides its MCC and MNC too rather
                             // than letting the two drift apart.

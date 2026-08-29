@@ -51,12 +51,15 @@
     <string name="sim_summary_unset">Pick a carrier and the operator fields are filled in from it.</string>
     <string name="sim_summary_format">Network country: %1$s\nNetwork operator: %2$s\nNetwork operator name: %3$s\nSIM country: %1$s\nSIM operator: %2$s\nSIM operator name: %3$s</string>
     <string name="action_regenerate">Draw a new number and ICCID</string>
+    <string name="sim_locale_hint">Changing the language is not a quiet spoof: the app really does load that language and renders in it from then on. Left off, the app still sees the real system language, which contradicts the SIM it is being shown.</string>
+
     <string name="sim_hint">The number and the ICCID are made up to fit the carrier, and they stay put once drawn: a SIM whose serial changes between two calls gives itself away. Picking a carrier also sets the cell tower MCC and MNC, so the two cannot contradict each other.\n\nThe operator fields are read inside the app itself rather than over a system call, so LSPosed has to have this module scoped to that app for them to apply. The number and the ICCID work either way.</string>
 
     <string name="switch_enable_location">Spoof location for this profile</string>
     <string name="switch_enable_cell">Spoof cell tower for this profile</string>
     <string name="switch_enable_wifi">Spoof Wi-Fi for this profile</string>
     <string name="switch_enable_sim">Spoof the SIM identity for this profile</string>
+    <string name="switch_enable_locale">Report the system language as %s</string>
     <string name="profile_feature_on">%s \u00b7 on</string>
     <string name="profile_feature_off">%s \u00b7 off</string>
 

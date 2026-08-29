@@ -42,12 +42,15 @@
     <string name="sim_summary_unset">选好运营商后，下面这些会自动填好。</string>
     <string name="sim_summary_format">网络国家码：%1$s\n网络运营商：%2$s\n网络运营商名称：%3$s\nSIM 国家码：%1$s\nSIM 运营商：%2$s\nSIM 运营商名称：%3$s</string>
     <string name="action_regenerate">重新生成号码和 ICCID</string>
+    <string name="sim_locale_hint">改语言不是悄悄改：应用会真的加载那套语言资源，界面从此就是那个语言。不开的话，应用看到的仍是真实系统语言，跟你给它看的那张卡是对不上的。</string>
+
     <string name="sim_hint">号码和 ICCID 按运营商的规则随机生成，生成之后就固定下来：同一张卡两次读到的序列号不一样，比不伪装还显眼。选择运营商时也会一并写好基站的 MCC / MNC，免得两边对不上。\n\n运营商那几项是应用在自己进程里读的，不走系统调用，所以要在 LSPosed 里把本模块的作用域勾上那个应用才会生效；号码和 ICCID 两种情况下都生效。</string>
 
     <string name="switch_enable_location">本配置伪装位置</string>
     <string name="switch_enable_cell">本配置伪装基站</string>
     <string name="switch_enable_wifi">本配置伪装 WiFi</string>
     <string name="switch_enable_sim">本配置伪装 SIM 卡信息</string>
+    <string name="switch_enable_locale">同时把系统语言报成 %s</string>
     <string name="profile_feature_on">%s \u00b7 已开启</string>
     <string name="profile_feature_off">%s \u00b7 已关闭</string>
 

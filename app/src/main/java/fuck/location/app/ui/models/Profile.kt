@@ -69,6 +69,15 @@ data class Profile(
     val phoneNumber: String = "",
     /** ICCID. */
     val simSerial: String = "",
+
+    /**
+     * Whether the app should also see the country's language as the system one.
+     * Held apart from [simEnabled] because it is the one spoof the user cannot
+     * miss: the app renders in that language from then on.
+     */
+    val localeEnabled: Boolean = false,
+    /** BCP-47 tag, derived from the country. */
+    val localeTag: String = "",
 ) {
     /**
      * A position drawn uniformly from the disc of radius [offset] around the

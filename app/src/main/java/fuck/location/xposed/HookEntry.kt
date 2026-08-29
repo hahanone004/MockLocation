@@ -16,6 +16,7 @@ import fuck.location.xposed.helpers.ConfigGateway
 import fuck.location.xposed.location.LocationHooker
 import fuck.location.xposed.location.WLANHooker
 import fuck.location.xposed.location.gnss.GnssHooker
+import fuck.location.xposed.system.LocaleHooker
 import java.util.concurrent.atomic.AtomicBoolean
 
 @ExperimentalStdlibApi
@@ -101,6 +102,9 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 // installing them costs an app nothing until it is configured.
                 step("sim identity") {
                     SimIdentityHooker().hookTelephonyManager(lpparam)
+                }
+                step("system language") {
+                    LocaleHooker().hookLocale(lpparam)
                 }
             }
         }

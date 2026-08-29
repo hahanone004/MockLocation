@@ -269,6 +269,15 @@ class ConfigGateway private constructor() {
     fun simSpoofFor(packageName: String): Profile? =
         profileFor(packageName)?.takeIf { it.simEnabled }
 
+    /**
+     * The language follows the SIM's country, so it only applies where the SIM
+     * identity does - a device claiming a Taiwanese SIM while reporting a
+     * German system language is a worse story than either alone.
+     */
+    @ExperimentalStdlibApi
+    fun localeSpoofFor(packageName: String): Profile? =
+        simSpoofFor(packageName)?.takeIf { it.localeEnabled && it.localeTag.isNotBlank() }
+
     @ExperimentalStdlibApi
     fun readPackageList(): List<String>? {
         val jsonAdapter: JsonAdapter<List<String>> = moshi.adapter()

@@ -84,6 +84,27 @@ class CarrierCatalogTest {
     }
 
     @Test
+    fun `a country names the language a phone sold there would carry`() {
+        assertEquals("zh-TW", taiwan.locale)
+
+        // Parsed rather than trusted: forLanguageTag answers the root locale
+        // for anything malformed, which would spoof the language away to "".
+        val parsed = java.util.Locale.forLanguageTag(taiwan.locale)
+        assertEquals("zh", parsed.language)
+        assertEquals("TW", parsed.country)
+    }
+
+    @Test
+    fun `every country names a parsable language`() {
+        CarrierCatalog.countries.forEach { country ->
+            val parsed = java.util.Locale.forLanguageTag(country.locale)
+
+            assertTrue("${country.iso} has an unparsable locale", parsed.language.isNotEmpty())
+            assertTrue(country.localeLabel.isNotBlank())
+        }
+    }
+
+    @Test
     fun `every carrier is described consistently`() {
         CarrierCatalog.countries.forEach { country ->
             assertTrue(country.iso == country.iso.lowercase())
