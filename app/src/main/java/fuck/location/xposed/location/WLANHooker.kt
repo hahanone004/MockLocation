@@ -29,37 +29,57 @@ class WLANHooker {
             binder?.javaClass?.classLoader
         }.getOrNull()
 
-        // Arm the future-load path first. A ROM-specific already-loaded class
-        // may exist but have a different method shape; failure to hook that
-        // candidate must not prevent a later Wi-Fi apex loader from succeeding.
-        val loadWatchers = findAllMethods(clazz, findSuper = true) {
-            name == "loadClassFromLoader" && isPrivate && isStatic
+        /*
+         * Arm the future-start path first. A ROM-specific already-loaded class
+         * may exist but have a different method shape; failing to hook that
+         * candidate must not stop a later Wi-Fi apex loader from succeeding.
+         *
+         * This used to watch loadClassFromLoader, which is still in the AOSP
+         * source but is a two-line private static helper, so a release build
+         * inlines it away - it is gone on LineageOS 23, and with it the only
+         * way to be told the service had started. Every boot then leaned on the
+         * retry timer instead. startService(Class) is public, and every route
+         * in ends at it: startService(String) and startServiceFromJar both load
+         * the class and hand it straight over. Nothing can optimise away a
+         * method the platform publishes.
+         */
+        val serviceStarts = findAllMethods(clazz, findSuper = true) {
+            name == "startService" && parameterCount == 1 && !isAbstract &&
+                parameterTypes[0] == Class::class.java
+        }.ifEmpty {
+            findAllMethods(clazz, findSuper = true) {
+                name == "startServiceFromJar" && parameterCount == 2 && !isAbstract
+            }
         }
-        if (loadWatchers.isEmpty() && serviceLoader == null) {
-            // Not a missing method so much as a service that has not started.
-            // loadClassFromLoader is gone from SystemServiceManager on current
-            // releases, so the only way in is the Wi-Fi apex loader, and that
-            // does not exist until the service is up - which is a little after
-            // the module installs its hooks. Saying "loadClassFromLoader is
-            // missing" sent everyone looking at the wrong thing; the retry a
-            // few seconds later is what actually fixes it.
-            throw IllegalStateException(
-                "the wifi service has not started yet, and ${clazz.name} has no " +
-                    "loadClassFromLoader to wait on; a retry should catch it"
+        if (serviceStarts.isEmpty() && serviceLoader == null) {
+            throw NoSuchMethodException(
+                "neither startService(Class) nor startServiceFromJar in ${clazz.name}, " +
+                    "and the wifi service has not started yet"
             )
         }
-        installOnce(loadWatchers, hookedLoadWatcherMethods) { method ->
+        installOnce(serviceStarts, hookedServiceStartMethods) { method ->
             method.hookMethod {
                 after { param ->
-                    if (param.args[0] != "com.android.server.wifi.WifiService") return@after
+                    if (param.hasThrowable()) return@after
+                    // The class being started, whichever shape the call takes:
+                    // startService is handed the Class, startServiceFromJar its
+                    // name. Anything outside the Wi-Fi service is not ours, and
+                    // checking the name first keeps this off the critical path
+                    // of every other service the system starts.
+                    val started = param.args.filterIsInstance<Class<*>>().firstOrNull()?.name
+                        ?: param.args.filterIsInstance<String>().firstOrNull()
+                    if (started?.startsWith(WIFI_SERVICE_PREFIX) != true) return@after
 
-                    Log.i("[WiFi] wifi service loaded, hooking it")
-                    val loader = param.args.getOrNull(1) as? ClassLoader ?: run {
-                        Log.w("[WiFi] service load did not provide a ClassLoader")
-                        return@after
-                    }
+                    val loader = param.args.filterIsInstance<Class<*>>().firstOrNull()?.classLoader
+                        ?: param.result?.javaClass?.classLoader
+                        ?: run {
+                            Log.w("[WiFi] $started started without a reachable ClassLoader")
+                            return@after
+                        }
+
+                    Log.i("[WiFi] wifi service started, hooking it")
                     try {
-                        tryHookWifiService(loader, "service load")
+                        tryHookWifiService(loader, "service start")
                     } catch (t: Throwable) {
                         Log.w("[WiFi] failed to hook wifi service: $t")
                         scheduleWifiRetry(loader, 1)
@@ -86,9 +106,12 @@ class WLANHooker {
             }
         if (!hookedLoadedService) {
             probeFailure?.let { throw it }
-            if (loadWatchers.isEmpty()) {
+            if (serviceStarts.isEmpty()) {
                 throw ClassNotFoundException("WifiServiceImpl from available loaders")
             }
+            // Not a failure: the service starts a moment after this runs, and
+            // the hook above is waiting for exactly that.
+            Log.i("[WiFi] waiting for the wifi service to start")
         }
     }
 
@@ -341,7 +364,8 @@ class WLANHooker {
         const val UNKNOWN_SSID = "<unknown ssid>"
         const val UNSPECIFIED_BSSID = "02:00:00:00:00:00"
         const val MIN_RSSI = -127
-        val hookedLoadWatcherMethods = ConcurrentHashMap.newKeySet<Method>()
+        const val WIFI_SERVICE_PREFIX = "com.android.server.wifi."
+        val hookedServiceStartMethods = ConcurrentHashMap.newKeySet<Method>()
         val hookedScanMethods = ConcurrentHashMap.newKeySet<Method>()
         val hookedConnectionMethods = ConcurrentHashMap.newKeySet<Method>()
         const val MAX_WIFI_RETRIES = 6
