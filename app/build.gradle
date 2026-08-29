@@ -22,9 +22,22 @@ android {
         buildConfig = true
     }
 
+    // Release signing is supplied by CI secrets. Never commit the keystore or
+    // its passwords; a missing value makes an assembleRelease invocation fail
+    // instead of silently producing an unsigned APK.
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("RELEASE_KEYSTORE_PATH") ?: "missing-release-keystore.jks")
+            storePassword System.getenv("RELEASE_STORE_PASSWORD") ?: "missing"
+            keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: "missing"
+            keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: "missing"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
