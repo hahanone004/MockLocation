@@ -6,9 +6,9 @@ import com.idanatz.oneadapter.external.interfaces.Diffable
 class AppListModel(
     val title: String,
     val packageName: String,
-    var icon: Drawable,
+    val icon: Drawable,
     /** Empty unless the app is pointed at something other than the default. */
-    var profileLabel: String = "",
+    val profileLabel: String = "",
 ) : Diffable {
     override fun areContentTheSame(other: Any): Boolean =
         other is AppListModel && title == other.title && profileLabel == other.profileLabel

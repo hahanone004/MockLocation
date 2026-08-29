@@ -15,6 +15,10 @@ import fuck.location.R
 import fuck.location.app.ui.config.ProfileEditors
 import fuck.location.databinding.ActivityMainBinding
 import fuck.location.xposed.helpers.ConfigGateway
+import fuck.location.xposed.helpers.reflect.Log
+import fuck.location.xposed.helpers.reflect.runOnMainThread
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
 
 @ExperimentalStdlibApi
 class MainActivity : AppCompatActivity(), View.OnClickListener {
@@ -24,7 +28,6 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         super.onCreate(savedInstanceState)
 
         ConfigGateway.get().setCustomContext(applicationContext)
-        ConfigGateway.get().migrateWhitelistIfNeeded(this)
 
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -36,6 +39,15 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
         binding.menuLocationCredit.setOnClickListener(this)
         binding.menuProfiles.setOnClickListener(this)
         binding.menuAbout.setOnClickListener(this)
+    }
+
+    /**
+     * The card counts profiles and assignments, and both change from the menus
+     * this screen opens, so it is read here rather than once at creation.
+     */
+    override fun onResume() {
+        super.onResume()
+        refreshFrameworkStatus()
     }
 
     /**
@@ -72,7 +84,7 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
             binding.moduleStatusText.text = getString(R.string.card_title_activated)
             binding.serviceStatusText.text = getString(R.string.card_detail_activated)
 
-            binding.serveTimes.text = frameworkStatus()
+            binding.serveTimes.text = getString(R.string.card_framework_checking)
         } else {
             binding.moduleStatusCard.setCardBackgroundColor(getColor(R.color.red_500))
             binding.moduleStatusIcon.setImageDrawable(AppCompatResources.getDrawable(this,
@@ -84,6 +96,39 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
             binding.menuProfiles.visibility = View.GONE
             binding.menuLocationCredit.visibility = View.GONE
+        }
+    }
+
+    /**
+     * Asks the framework half what it is doing, off the main thread.
+     *
+     * Everything below crosses a binder into system_server, and the legacy
+     * migration writes a file behind that same call. Running it from onCreate
+     * meant the first frame waited on a round trip that, when the framework
+     * half is not there at all, is a round trip to an exception.
+     */
+    private fun refreshFrameworkStatus() {
+        // Without the module loaded there is no framework half to ask, and the
+        // card that would carry the answer is not on screen.
+        if (!isModuleActivated()) return
+
+        thread {
+            if (migrationPending.compareAndSet(true, false)) {
+                try {
+                    ConfigGateway.get().migrateWhitelistIfNeeded(applicationContext)
+                } catch (t: Throwable) {
+                    // A migration that cannot run leaves the old config in
+                    // place and is retried next launch; it must not cost the
+                    // user the settings screen.
+                    Log.e("the legacy migration could not run", t)
+                    migrationPending.set(true)
+                }
+            }
+
+            val status = frameworkStatus()
+            runOnMainThread {
+                if (!isFinishing && !isDestroyed) binding.serveTimes.text = status
+            }
         }
     }
 
@@ -110,5 +155,10 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
     @Keep
     fun isModuleActivated(): Boolean {
         return false
+    }
+
+    private companion object {
+        /** Once per process: the migration itself is idempotent, the reads are not free. */
+        val migrationPending = AtomicBoolean(true)
     }
 }

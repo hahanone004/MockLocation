@@ -2,10 +2,10 @@ package fuck.location.xposed.cellar
 
 import android.annotation.SuppressLint
 import android.telephony.*
+import fuck.location.xposed.helpers.reflect.Log
 import fuck.location.xposed.helpers.reflect.findAllMethods
 import fuck.location.xposed.helpers.reflect.hookMethod
 import fuck.location.xposed.helpers.reflect.isPublic
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.app.ui.models.Profile
 import fuck.location.xposed.cellar.identity.Lte
@@ -31,7 +31,7 @@ class PhoneInterfaceManagerHooker {
         val clazz: Class<*> =
             lpparam.classLoader.loadClass("com.android.phone.PhoneInterfaceManager")
 
-        XposedBridge.log("FL: [Cellar] Finding method in PhoneInterfaceManager")
+        Log.i("[Cellar] Finding method in PhoneInterfaceManager")
 
         matchedMethods(clazz, "getImeiForSlot") {
             name == "getImeiForSlot" && isPublic
@@ -43,7 +43,7 @@ class PhoneInterfaceManagerHooker {
                 val customIMEI = profile.deviceImei
 
                 param.result = customIMEI
-                XposedBridge.log("FL: [Cellar] getImeiForSlot for $packageName -> $customIMEI")
+                Log.i("[Cellar] getImeiForSlot for $packageName -> $customIMEI")
             }
         }
 
@@ -57,7 +57,7 @@ class PhoneInterfaceManagerHooker {
                 val customMEID = profile.deviceMeid
 
                 param.result = customMEID
-                XposedBridge.log("FL: [Cellar] getMeidForSlot for $packageName -> $customMEID")
+                Log.i("[Cellar] getMeidForSlot for $packageName -> $customMEID")
             }
         }
 
@@ -72,11 +72,11 @@ class PhoneInterfaceManagerHooker {
                     val reported = param.result as? CellIdentityLte
                     if (profile.describesCell) Lte().cellIdentity(profile, reported) else null
                 } catch (t: Throwable) {
-                    XposedBridge.log("FL: [Cellar] getCellLocation spoof failed, returning null: $t")
+                    Log.w("[Cellar] getCellLocation spoof failed, returning null: $t")
                     null
                 }
 
-                XposedBridge.log("FL: [Cellar] getCellLocation for $packageName -> ${param.result}")
+                Log.i("[Cellar] getCellLocation for $packageName -> ${param.result}")
             }
         }
 
@@ -100,10 +100,10 @@ class PhoneInterfaceManagerHooker {
                         cells.add(fuck.location.xposed.cellar.info.Lte().cellInfo(profile))
                     }
                 } catch (t: Throwable) {
-                    XposedBridge.log("FL: [Cellar] getAllCellInfo spoof failed, returning empty: $t")
+                    Log.w("[Cellar] getAllCellInfo spoof failed, returning empty: $t")
                 }
 
-                XposedBridge.log("FL: [Cellar] getAllCellInfo for $packageName -> ${cells.size} cell(s)")
+                Log.i("[Cellar] getAllCellInfo for $packageName -> ${cells.size} cell(s)")
                 param.result = cells
             }
         }
@@ -115,7 +115,7 @@ class PhoneInterfaceManagerHooker {
                 if (param.hasThrowable()) return@after
                 val (packageName, _) = spoofedCellProfile(param) ?: return@after
 
-                XposedBridge.log("FL: [Cellar] getNeighboringCellInfo for $packageName -> empty")
+                Log.i("[Cellar] getNeighboringCellInfo for $packageName -> empty")
                 val customNeighboringCellInfo = ArrayList<NeighboringCellInfo>()
                 param.result = customNeighboringCellInfo
             }
@@ -132,7 +132,7 @@ class PhoneInterfaceManagerHooker {
                     } == true
                 }
                 if (callback == null) {
-                    XposedBridge.log("FL: [Cellar] no cell-info callback in ${param.method}")
+                    Log.w("[Cellar] no cell-info callback in ${param.method}")
                     param.result = neutralResult((param.method as Method).returnType)
                     return@before
                 }
@@ -147,7 +147,7 @@ class PhoneInterfaceManagerHooker {
                     // The stock request would deliver real modem data. If its
                     // callback class cannot be hooked, suppress the request and
                     // let the caller receive the method's normal neutral result.
-                    XposedBridge.log("FL: [Cellar] callback hook unavailable; suppressing request")
+                    Log.w("[Cellar] callback hook unavailable; suppressing request")
                     param.result = neutralResult((param.method as Method).returnType)
                 }
             }
@@ -173,15 +173,15 @@ class PhoneInterfaceManagerHooker {
                         val pending = takePendingCellInfo(callbackKey(param.thisObject))
                             ?: return@before
                         param.args[0] = spoofedCells(pending.profile)
-                        XposedBridge.log(
-                            "FL: [Cellar] async CellInfo for ${pending.packageName} substituted"
+                        Log.i(
+                            "[Cellar] async CellInfo for ${pending.packageName} substituted"
                         )
                     }
                 }
             } catch (t: Throwable) {
                 hookedCallbackMethods.remove(method)
                 installed = false
-                XposedBridge.log("FL: [Cellar] failed to hook callback $method: $t")
+                Log.w("[Cellar] failed to hook callback $method: $t")
             }
         }
 
@@ -194,7 +194,7 @@ class PhoneInterfaceManagerHooker {
                     }
                 } catch (t: Throwable) {
                     hookedCallbackMethods.remove(method)
-                    XposedBridge.log("FL: [Cellar] failed to hook callback error $method: $t")
+                    Log.w("[Cellar] failed to hook callback error $method: $t")
                 }
             }
         return installed
@@ -235,7 +235,7 @@ class PhoneInterfaceManagerHooker {
                 add(fuck.location.xposed.cellar.info.Lte().cellInfo(profile))
             }
         } catch (t: Throwable) {
-            XposedBridge.log("FL: [Cellar] CellInfo spoof failed, returning empty: $t")
+            Log.w("[Cellar] CellInfo spoof failed, returning empty: $t")
         }
     }
 
@@ -246,7 +246,7 @@ class PhoneInterfaceManagerHooker {
     ): List<java.lang.reflect.Method> = findAllMethods(clazz, findSuper = true, predicate)
         .also {
             if (it.isEmpty()) {
-                XposedBridge.log("FL: [Cellar] method unavailable: $label in ${clazz.name}")
+                Log.w("[Cellar] method unavailable: $label in ${clazz.name}")
             }
         }
 
@@ -267,15 +267,11 @@ class PhoneInterfaceManagerHooker {
     private fun spoofedCellProfile(
         param: de.robv.android.xposed.XC_MethodHook.MethodHookParam,
         simIdentity: Boolean = false,
-    ): Pair<String, Profile>? {
-        param.args.filterIsInstance<String>().forEach { candidate ->
-            val profile = if (simIdentity) {
-                ConfigGateway.get().simSpoofFor(candidate)
-            } else {
-                ConfigGateway.get().cellSpoofFor(candidate)
-            }
-            if (profile != null) return candidate to profile
+    ): Pair<String, Profile>? = ConfigGateway.get().spoofedCaller(param) { candidate ->
+        if (simIdentity) {
+            ConfigGateway.get().simSpoofFor(candidate)
+        } else {
+            ConfigGateway.get().cellSpoofFor(candidate)
         }
-        return null
     }
 }

@@ -41,7 +41,7 @@
     <string name="field_bandwidth">Bandwidth</string>
 
     <string name="field_wifi_list">Access points</string>
-    <string name="field_wifi_hint">One per line: name | BSSID | signal dBm | frequency MHz. Only the name is required. An empty list reports no networks at all, which is itself conspicuous.</string>
+    <string name="field_wifi_hint">One per line: name | BSSID | signal dBm | frequency MHz | capabilities. Only the name is required; write \\| for a pipe inside a name. An empty list reports no networks at all, which is itself conspicuous.</string>
 
     <string name="field_sim_country">Country</string>
     <string name="field_sim_carrier">Carrier</string>
@@ -94,9 +94,9 @@
     <string name="card_title_activated">Activated</string>
     <string name="card_detail_activated">Go settings for further set up</string>
     <string name="card_framework_ready">%1$d profile(s) spoofing \u00b7 %2$d app(s) assigned</string>
+    <string name="card_framework_checking">Checking the framework side\u2026</string>
     <string name="card_framework_missing">Not hooked into system_server \u2014 scope this module to System Framework in LSPosed and reboot</string>
 
-    <string name="system_app">System apps</string>
 
     <string name="about_slogan">Fuck Location</string>
     <string name="about_summary_title">About</string>
@@ -105,28 +105,12 @@
     <string name="about_usage_content">Enable the module and include System Framework in its scope, then reboot the device. Create a profile, configure the required items, and assign it to an app. SIM identity and language changes also require the target app to be included in the module scope and restarted.</string>
     <string name="about_notice_title">Notice</string>
     <string name="about_notice_content">Use this app only on devices and applications you are authorized to test. Changes may not take effect until the related app is force stopped or the device is restarted. Compatibility can vary between Android versions, ROMs, and hook frameworks.</string>
-    <string name="about_introduction_title">Tips and help</string>
-    <string name="about_introduction_content">A module for returning specified location information to an application.\n\nThis application is designed to return the appropriate location information like a specific application (instead of using high precision positioning in the background at all times) to protect privacy while satisfying the usage scenario.</string>
 
-    <string name="about_legal_title">Legal information</string>
-    <string name="about_legal_content">Although it is somewhat uninteresting to host a legal notice in an open source application, we put such a notice here to prevent abuse and repercussions by some unsuspecting people.\n\nThis module was developed for learning purposes. Please delete this module after 24 hrs of download. \nYou agree to use this module (i.e. Fuck Location, hereinafter) only for legally compliant purposes. You agree that the author will not be held liable for any consequences resulting from a violation of this statement. \n\nBy continuing to use this module, you agree to the above terms.\n\nNotice: If there are anything in English version contract to the original Chinese version, chinese version applied.</string>
 
-    <string name="about_developer_title">Developers &amp; Contributors</string>
-    <string name="about_developer_name_mogu">Mogu</string>
-    <string name="about_developer_description_mogu">Developer &amp; designer</string>
 
-    <string name="about_developer_name_zypa13510">zypA13510</string>
-    <string name="about_developer_description_zypa13510">Help to implement negative coordinate support</string>
 
-    <string name="about_developer_name_nullptr">Dr-TSNG</string>
-    <string name="about_developer_description_nullptr">Idea spark</string>
 
-    <string name="about_developer_name_leafstative">LeafStative</string>
-    <string name="about_developer_description_leafstative">Help to implement better app selection page</string>
 
-    <string name="about_developer_name_theprimalpea">ThePrimalPea</string>
-    <string name="about_developer_description_theprimalpea">Vietnamese translation</string>
 
-    <string name="about_opensource_title">Open Source Licenses</string>
     <string name="no_result">No result</string>
 </resources>

@@ -133,7 +133,7 @@ class HookFactory(private val method: Method, private val priority: Int) {
                 try {
                     beforeAction?.invoke(param)
                 } catch (e: Throwable) {
-                    XposedBridge.log("FL: hook (before) on ${method.name} threw: $e")
+                    Log.w("hook (before) on ${method.name} threw: $e")
                 }
             }
 
@@ -141,7 +141,7 @@ class HookFactory(private val method: Method, private val priority: Int) {
                 try {
                     afterAction?.invoke(param)
                 } catch (e: Throwable) {
-                    XposedBridge.log("FL: hook (after) on ${method.name} threw: $e")
+                    Log.w("hook (after) on ${method.name} threw: $e")
                 }
             }
         }
@@ -206,23 +206,32 @@ object Log {
     fun d(message: String) = write("D", message)
     fun i(message: String) = write("I", message)
     fun w(message: String) = write("W", message)
-    fun e(message: String, throwable: Throwable? = null) =
-        write("E", message + (throwable?.let { " $it" } ?: ""))
+    fun e(message: String, throwable: Throwable? = null) = write("E", message, throwable)
 
     /*
      * Written to both sinks on purpose. XposedBridge's log is the one a module
      * manager shows, but not every framework has a viewer for it - and when the
      * question is "did this module load at all", the answer has to be reachable
      * from plain logcat too (adb logcat -s FuckLocation).
+     *
+     * The level is carried into logcat rather than folded into the message.
+     * Everything used to go out at INFO, so `logcat FuckLocation:E` - the first
+     * thing anyone filters by when a hook is misbehaving - matched nothing at
+     * all, and a failure read exactly like a progress report.
      */
-    private fun write(level: String, message: String) {
+    private fun write(level: String, message: String, throwable: Throwable? = null) {
         try {
-            XposedBridge.log("$tag/$level: $message")
+            XposedBridge.log("$tag/$level: $message" + (throwable?.let { " $it" } ?: ""))
         } catch (t: Throwable) {
             // No framework around: logcat is the only sink left.
         }
 
-        android.util.Log.i(tag, "$level: $message")
+        when (level) {
+            "E" -> android.util.Log.e(tag, message, throwable)
+            "W" -> android.util.Log.w(tag, message, throwable)
+            "D" -> android.util.Log.d(tag, message, throwable)
+            else -> android.util.Log.i(tag, message, throwable)
+        }
     }
 }
 

@@ -8,7 +8,6 @@ import android.os.Looper
 import android.os.SystemClock
 import fuck.location.app.ui.models.FakeAccessPoint
 import fuck.location.xposed.helpers.reflect.*
-import de.robv.android.xposed.XposedBridge
 import fuck.location.xposed.helpers.ConfigGateway
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
@@ -44,15 +43,15 @@ class WLANHooker {
                 after { param ->
                     if (param.args[0] != "com.android.server.wifi.WifiService") return@after
 
-                    XposedBridge.log("FL: [WiFi] wifi service loaded, hooking it")
+                    Log.i("[WiFi] wifi service loaded, hooking it")
                     val loader = param.args.getOrNull(1) as? ClassLoader ?: run {
-                        XposedBridge.log("FL: [WiFi] service load did not provide a ClassLoader")
+                        Log.w("[WiFi] service load did not provide a ClassLoader")
                         return@after
                     }
                     try {
                         tryHookWifiService(loader, "service load")
                     } catch (t: Throwable) {
-                        XposedBridge.log("FL: [WiFi] failed to hook wifi service: $t")
+                        Log.w("[WiFi] failed to hook wifi service: $t")
                         scheduleWifiRetry(loader, 1)
                     }
                 }
@@ -70,8 +69,8 @@ class WLANHooker {
                         tryHookWifiService(loader, "already loaded") || hookedLoadedService
                 } catch (t: Throwable) {
                     probeFailure = t
-                    XposedBridge.log(
-                        "FL: [WiFi] failed already-loaded probe from $loader: $t"
+                    Log.w(
+                        "[WiFi] failed already-loaded probe from $loader: $t"
                     )
                 }
             }
@@ -89,19 +88,19 @@ class WLANHooker {
             loader.loadClass("com.android.server.wifi.WifiServiceImpl")
         }.getOrNull() ?: return false
 
-        XposedBridge.log("FL: [WiFi] hooking WifiServiceImpl from $source")
+        Log.i("[WiFi] hooking WifiServiceImpl from $source")
         var failure: Throwable? = null
         try {
             hookScanResults(wifiClazz)
         } catch (t: Throwable) {
             failure = t
-            XposedBridge.log("FL: [WiFi] failed to hook scan results: $t")
+            Log.w("[WiFi] failed to hook scan results: $t")
         }
         try {
             hookConnectionInfo(wifiClazz)
         } catch (t: Throwable) {
             failure = t
-            XposedBridge.log("FL: [WiFi] failed to hook connection info: $t")
+            Log.w("[WiFi] failed to hook connection info: $t")
         }
         failure?.let { throw it }
         return true
@@ -109,7 +108,7 @@ class WLANHooker {
 
     private fun scheduleWifiRetry(loader: ClassLoader, attempt: Int) {
         if (attempt > MAX_WIFI_RETRIES) {
-            XposedBridge.log("FL: [WiFi] giving up after $MAX_WIFI_RETRIES retries")
+            Log.w("[WiFi] giving up after $MAX_WIFI_RETRIES retries")
             return
         }
         try {
@@ -119,12 +118,12 @@ class WLANHooker {
                         scheduleWifiRetry(loader, attempt + 1)
                     }
                 } catch (t: Throwable) {
-                    XposedBridge.log("FL: [WiFi] retry $attempt failed: $t")
+                    Log.w("[WiFi] retry $attempt failed: $t")
                     scheduleWifiRetry(loader, attempt + 1)
                 }
             }, WIFI_RETRY_DELAY_MS)
         } catch (t: Throwable) {
-            XposedBridge.log("FL: [WiFi] cannot schedule retry: $t")
+            Log.w("[WiFi] cannot schedule retry: $t")
         }
     }
 
@@ -138,21 +137,21 @@ class WLANHooker {
             method.hookMethod {
                 after { param ->
                 if (param.hasThrowable()) return@after
-                val (packageName, profile) = spoofedWifiProfile(param.args) ?: return@after
+                val (packageName, profile) = spoofedWifiProfile(param) ?: return@after
                 val originalResult = param.result
                 // From this point on, never retain the real scan result if
                 // construction differs on a vendor framework.
                 param.result = null
 
-                XposedBridge.log(
-                    "FL: [WiFi] in getScanResults for $packageName, reporting " +
+                Log.i(
+                    "[WiFi] in getScanResults for $packageName, reporting " +
                         "${profile.wifiAccessPoints.size} custom access point(s)"
                 )
 
                 val results = try {
                     profile.wifiAccessPoints.map { buildScanResult(it) }
                 } catch (t: Throwable) {
-                    XposedBridge.log("FL: [WiFi] scan spoof failed, returning empty: $t")
+                    Log.w("[WiFi] scan spoof failed, returning empty: $t")
                     emptyList()
                 }
 
@@ -180,7 +179,7 @@ class WLANHooker {
             method.hookMethod {
                 after { param ->
                 if (param.hasThrowable()) return@after
-                val (packageName, profile) = spoofedWifiProfile(param.args) ?: return@after
+                val (packageName, profile) = spoofedWifiProfile(param) ?: return@after
                 // Null is a valid fail-closed binder result if WifiInfo.Builder
                 // is incompatible with this ROM; it must not fall back to the
                 // original connection after the profile has matched.
@@ -191,8 +190,8 @@ class WLANHooker {
                 // same "not associated" state the framework uses.
                 val connected = profile.wifiAccessPoints.firstOrNull()
 
-                XposedBridge.log(
-                    "FL: [WiFi] in getConnectionInfo for $packageName, " +
+                Log.i(
+                    "[WiFi] in getConnectionInfo for $packageName, " +
                         "reporting ${connected?.ssid ?: "no association"}"
                 )
 
@@ -202,25 +201,51 @@ class WLANHooker {
                         .setBssid(connected?.bssid ?: UNSPECIFIED_BSSID)
                         .setRssi(connected?.level ?: MIN_RSSI)
                         .setNetworkId(if (connected != null) 0 else -1)
-                    if (connected != null) {
-                        // Builder.setFrequency is present on newer framework
-                        // releases but absent from the compile SDK used by this
-                        // project. Resolve it at runtime so both remain valid.
-                        runCatching {
-                            builder.javaClass
-                                .getMethod("setFrequency", Int::class.javaPrimitiveType)
-                                .invoke(builder, connected.frequency)
-                        }.onFailure {
-                            XposedBridge.log("FL: [WiFi] frequency setter unavailable: $it")
-                        }
-                    }
-                    param.result = builder.build()
+                        .setCurrentSecurityType(securityTypeOf(connected?.capabilities))
+
+                    val info = builder.build()
+                    if (connected != null) applyFrequency(info, connected.frequency)
+                    param.result = info
                 } catch (t: Throwable) {
-                    XposedBridge.log("FL: [WiFi] connection spoof failed, returning null: $t")
+                    Log.w("[WiFi] connection spoof failed, returning null: $t")
                 }
                 }
             }
         }
+    }
+
+    /**
+     * The frequency, which WifiInfo.Builder has no setter for.
+     *
+     * There never was one - not on any release - so the runtime lookup that
+     * used to stand here failed on every single call and the connection was
+     * reported at 0 MHz while the scan results for the very same BSSID named a
+     * real channel. Two answers about one network that cannot both be true is
+     * the kind of thing this module exists to avoid, so the field is written
+     * directly, the way the cell hooks already write theirs.
+     */
+    private fun applyFrequency(info: WifiInfo, frequency: Int) {
+        try {
+            findField(info.javaClass, true) { name == "mFrequency" }.set(info, frequency)
+        } catch (t: Throwable) {
+            Log.w("[WiFi] cannot report the frequency: $t")
+        }
+    }
+
+    /**
+     * The security type WifiInfo reports, derived from the capabilities string
+     * the same access point advertises in the scan results. Left unset, the two
+     * disagreed: an AP announcing WPA2 whose connection claimed to know nothing
+     * about its own security.
+     */
+    private fun securityTypeOf(capabilities: String?): Int = when {
+        capabilities == null -> WifiInfo.SECURITY_TYPE_UNKNOWN
+        capabilities.contains("SAE") -> WifiInfo.SECURITY_TYPE_SAE
+        capabilities.contains("EAP") -> WifiInfo.SECURITY_TYPE_EAP
+        capabilities.contains("PSK") -> WifiInfo.SECURITY_TYPE_PSK
+        capabilities.contains("OWE") -> WifiInfo.SECURITY_TYPE_OWE
+        capabilities.contains("WEP") -> WifiInfo.SECURITY_TYPE_WEP
+        else -> WifiInfo.SECURITY_TYPE_OPEN
     }
 
     /**
@@ -243,7 +268,7 @@ class WLANHooker {
         } catch (e: Exception) {
             // Older or trimmed-down builds: the deprecated field alone still
             // satisfies everything that reads ScanResult.SSID.
-            XposedBridge.log("FL: [WiFi] setWifiSsid unavailable, setting SSID directly: $e")
+            Log.w("[WiFi] setWifiSsid unavailable, setting SSID directly: $e")
             scanResult.SSID = accessPoint.ssid
         }
 
@@ -274,18 +299,16 @@ class WLANHooker {
                 .getConstructor(List::class.java)
                 .newInstance(results)
         } catch (e: Exception) {
-            XposedBridge.log("FL: [WiFi] cannot construct scan result container: $e")
+            Log.w("[WiFi] cannot construct scan result container: $e")
             null
         }
     }
 
     @OptIn(ExperimentalStdlibApi::class)
-    private fun spoofedWifiProfile(args: Array<Any?>): Pair<String, fuck.location.app.ui.models.Profile>? {
-        args.filterIsInstance<String>().forEach { candidate ->
-            ConfigGateway.get().wifiSpoofFor(candidate)?.let { return candidate to it }
-        }
-        return null
-    }
+    private fun spoofedWifiProfile(
+        param: de.robv.android.xposed.XC_MethodHook.MethodHookParam,
+    ): Pair<String, fuck.location.app.ui.models.Profile>? =
+        ConfigGateway.get().spoofedCaller(param) { ConfigGateway.get().wifiSpoofFor(it) }
 
     private fun installOnce(
         methods: List<Method>,

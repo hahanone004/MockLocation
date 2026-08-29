@@ -7,10 +7,10 @@ import android.os.Looper
 import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.IXposedHookLoadPackage
 import de.robv.android.xposed.IXposedHookZygoteInit
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.BuildConfig
 
+import fuck.location.xposed.cellar.NetworkTypeHooker
 import fuck.location.xposed.cellar.PhoneInterfaceManagerHooker
 import fuck.location.xposed.cellar.SimIdentityHooker
 import fuck.location.xposed.cellar.TelephonyRegistryHooker
@@ -78,7 +78,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
 
         when (lpparam.packageName) {
             BuildConfig.APPLICATION_ID -> {
-                XposedBridge.log("FL: Try to hook the module")
+                Log.i("Try to hook the module")
                 val clazz = lpparam.classLoader.loadClass("fuck.location.app.ui.activities.MainActivity")
 
                 val activationMethods = findAllMethods(clazz, findSuper = true) {
@@ -89,7 +89,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 }
                 activationMethods.hookMethod {
                     after { param ->
-                        XposedBridge.log("FL: Unlock the module")
+                        Log.i("Unlock the module")
                         param.result = true
                     }
                 }
@@ -104,6 +104,9 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 step("sim identity (phone)") {
                     SimIdentityHooker().hookPhoneProcess(lpparam)
                 }
+                step("network type") {
+                    NetworkTypeHooker().hookPhoneProcess(lpparam)
+                }
             }
 
             else -> {
@@ -112,6 +115,8 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 // TelephonyManager answers most of it without leaving the
                 // process. The hooks check the profile when they fire, so
                 // installing them costs an app nothing until it is configured.
+                if (!ownsProcess(lpparam)) return
+
                 step("sim identity") {
                     SimIdentityHooker().hookTelephonyManager(lpparam)
                 }
@@ -120,6 +125,28 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 }
             }
         }
+    }
+
+    /**
+     * Whether this load is the app the process belongs to.
+     *
+     * handleLoadPackage fires for every package loaded into a process, not just
+     * its owner: WebView arrives this way inside whichever app is showing one.
+     * Hooking those installed a second copy of the same hooks on the very same
+     * bootclasspath methods - the classes come from the boot loader either way -
+     * and then asked the config channel about a package the caller does not own,
+     * which it rightly refused, once per query, in the log.
+     *
+     * A framework that does not fill the process name in gets the old
+     * behaviour rather than no hooks at all.
+     */
+    private fun ownsProcess(lpparam: XC_LoadPackage.LoadPackageParam): Boolean {
+        val process = lpparam.processName
+        if (process.isNullOrEmpty()) return true
+        if (process.substringBefore(':') == lpparam.packageName) return true
+
+        Log.i("skipping ${lpparam.packageName} loaded into $process")
+        return false
     }
 
     /**

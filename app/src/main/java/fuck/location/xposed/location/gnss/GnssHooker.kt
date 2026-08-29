@@ -2,10 +2,10 @@ package fuck.location.xposed.location.gnss
 
 import android.annotation.SuppressLint
 import fuck.location.xposed.helpers.ConfigGateway
+import fuck.location.xposed.helpers.reflect.Log
 import fuck.location.xposed.helpers.reflect.findAllMethods
 import fuck.location.xposed.helpers.reflect.hookBefore
 import fuck.location.xposed.helpers.reflect.isPublic
-import de.robv.android.xposed.XposedBridge
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 
@@ -30,7 +30,7 @@ class GnssHooker {
         }
         resolved.forEach { (methodName, methods) ->
             if (methods.isEmpty()) {
-                XposedBridge.log("FL: GNSS method unavailable: $methodName in ${clazz.name}")
+                Log.w("GNSS method unavailable: $methodName in ${clazz.name}")
             }
         }
 
@@ -62,7 +62,7 @@ class GnssHooker {
             ConfigGateway.get().locationSpoofFor(it) != null
         } ?: return
 
-        XposedBridge.log("FL: disabling ${param.method.name} for $packageName")
+        Log.i("disabling ${param.method.name} for $packageName")
         val returnType = (param.method as Method).returnType
         param.result = if (returnType == Boolean::class.javaPrimitiveType) false else null
     }

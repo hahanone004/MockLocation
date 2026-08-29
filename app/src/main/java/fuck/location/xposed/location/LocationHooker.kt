@@ -6,7 +6,6 @@ import android.os.SystemClock
 import android.util.ArrayMap
 import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 import fuck.location.xposed.helpers.ConfigGateway
 import java.lang.Exception
 import java.lang.reflect.Field
@@ -17,6 +16,15 @@ class LocationHooker {
     companion object {
         /** Concrete accept methods already carrying our argument hook. */
         private val hookedRegistrationMethods = ConcurrentHashMap.newKeySet<Method>()
+        /**
+         * Registration classes already looked at. onReportLocation runs at
+         * whatever rate the provider reports at, and every report used to
+         * re-scan each live registration's class - declared methods plus the
+         * whole superclass chain - to rediscover a method set that was already
+         * hooked. The method set below deduplicated the hooks; nothing
+         * deduplicated the reflection that found them.
+         */
+        private val armedRegistrationClasses = ConcurrentHashMap.newKeySet<Class<*>>()
         /** Service/geofence methods, so a failed sibling step can be retried safely. */
         private val hookedServiceMethods = ConcurrentHashMap.newKeySet<Method>()
     }
@@ -83,17 +91,17 @@ class LocationHooker {
                     location.extras = null
                     clearInconsistentMotionFields(location)
 
-                    XposedBridge.log(
-                        "FL: getLastLocation for $packageName -> " +
+                    Log.i(
+                        "getLastLocation for $packageName -> " +
                             "${location.latitude}, ${location.longitude}")
                     it.result = location
                 } catch (e: Throwable) {
-                    XposedBridge.log("FL: Fuck with exceptions! $e")
+                    Log.i("Fuck with exceptions! $e")
                     // Once the caller has resolved to a spoofed profile, never
                     // leave the original real result in place on an error.
                     if (profile != null) {
                         it.result = fallbackLocation(profile!!)
-                        XposedBridge.log("FL: getLastLocation fallback for $packageName")
+                        Log.i("getLastLocation fallback for $packageName")
                     }
                 }
                 }
@@ -132,7 +140,7 @@ class LocationHooker {
                     // matched a profile. Suppressing an unknown owner's update
                     // disables geofencing globally on ROMs with a different
                     // owner representation.
-                    XposedBridge.log("FL: geofence owner lookup failed; leaving update alone: $t")
+                    Log.w("geofence owner lookup failed; leaving update alone: $t")
                     return@hookBefore
                 }
                 val profile = ConfigGateway.get().locationSpoofFor(packageName)
@@ -182,6 +190,7 @@ class LocationHooker {
      */
     @OptIn(ExperimentalStdlibApi::class)
     private fun installRegistrationHook(registrationClass: Class<*>) {
+        if (!armedRegistrationClasses.add(registrationClass)) return
         try {
             val methods = findAllMethods(registrationClass, findSuper = true) {
                 name == "acceptLocationChange" && parameterCount == 1
@@ -204,18 +213,21 @@ class LocationHooker {
                             // A null operation means this update is filtered
                             // out. Never pass real coordinates after a profile
                             // has positively matched.
-                            XposedBridge.log("FL: failed to build location for $packageName: $t")
+                            Log.w("failed to build location for $packageName: $t")
                             callback.result = null
                             return@hookBefore
                         }
                     }
                 } catch (t: Throwable) {
                     hookedRegistrationMethods.remove(method)
-                    XposedBridge.log("FL: failed to hook $method: $t")
+                    // Let the next report try this class again.
+                    armedRegistrationClasses.remove(registrationClass)
+                    Log.w("failed to hook $method: $t")
                 }
             }
         } catch (t: Throwable) {
-            XposedBridge.log("FL: failed to hook ${registrationClass.name}: $t")
+            armedRegistrationClasses.remove(registrationClass)
+            Log.w("failed to hook ${registrationClass.name}: $t")
         }
     }
 

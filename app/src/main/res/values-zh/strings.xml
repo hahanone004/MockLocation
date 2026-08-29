@@ -32,7 +32,7 @@
     <string name="field_bandwidth">带宽</string>
 
     <string name="field_wifi_list">热点列表</string>
-    <string name="field_wifi_hint">每行一个：名称 | BSSID | 信号 dBm | 频率 MHz。只有名称是必填的。列表留空会让应用一个 WiFi 都扫不到，这本身也很可疑。</string>
+    <string name="field_wifi_hint">每行一个：名称 | BSSID | 信号 dBm | 频率 MHz | 加密方式。只有名称是必填的；名称里要用竖线请写成 \\|。列表留空会让应用一个 WiFi 都扫不到，这本身也很可疑。</string>
 
     <string name="field_sim_country">国家 / 地区</string>
     <string name="field_sim_carrier">运营商</string>
@@ -85,9 +85,9 @@
     <string name="card_title_activated">模块已经激活</string>
     <string name="card_detail_activated">请前往“设置”以对模块进行进一步设定</string>
     <string name="card_framework_ready">%1$d 个配置已开启伪装 \u00b7 %2$d 个应用已指派</string>
+    <string name="card_framework_checking">正在检查框架端\u2026</string>
     <string name="card_framework_missing">未接入系统框架 \u2014 请在 LSPosed 勾选「系统框架」作用域后重启</string>
 
-    <string name="system_app">系统应用</string>
 
     <string name="about_slogan">Fuck Location</string>
     <string name="about_summary_title">应用介绍</string>
@@ -96,29 +96,13 @@
     <string name="about_usage_content">启用模块并将“系统框架”加入作用域，然后重启设备。新建配置，填写需要模拟的内容并分配给目标应用。SIM 身份和系统语言还需要将目标应用加入模块作用域，并重启目标应用进程。</string>
     <string name="about_notice_title">注意事项</string>
     <string name="about_notice_content">请仅在有权管理或测试的设备和应用中使用。部分修改需要强行停止目标应用或重启设备后才会生效。不同 Android 版本、系统和 Hook 框架的兼容情况可能有所差异。</string>
-    <string name="about_introduction_title">关于和帮助</string>
-    <string name="about_introduction_content">一个用于向应用返回指定位置信息的模块。\n\n这个应用旨在像特定的应用返回合适的位置信息（而不是随时都在后台使用高精度定位），在满足使用场景的情况下，保护隐私。</string>
 
-    <string name="about_legal_title">法律与合规</string>
-    <string name="about_legal_content">尽管在一个开源应用里存放法律声明有些无趣，但为了防止某些不怀好意的人滥用并造成影响，我们还是在这里放了这样一份声明。\n\n该模块的一切开发旨在学习开发。请在下载 24 小时之后删除本模块。\n您同意仅将本模块（即 Fuck Location，下同）用于合法合规的用途。如因违反该声明而造成任何后果，您同意作者不为此承担任何责任。\n\n继续使用本模块，即视为您同意上述条款和内容。</string>
 
-    <string name="about_developer_title">开发者 &amp; 致谢</string>
-    <string name="about_developer_name_mogu">Mogu</string>
-    <string name="about_developer_description_mogu">开发 &amp; 设计</string>
 
-    <string name="about_developer_name_zypa13510">zypA13510</string>
-    <string name="about_developer_description_zypa13510">帮忙实现了负坐标系选择</string>
 
-    <string name="about_developer_name_nullptr">Dr-TSNG</string>
-    <string name="about_developer_description_nullptr">提供灵感</string>
 
-    <string name="about_developer_name_leafstative">LeafStative</string>
-    <string name="about_developer_description_leafstative">帮忙实现了更好的应用选择页面</string>
 
-    <string name="about_developer_name_theprimalpea">ThePrimalPea</string>
-    <string name="about_developer_description_theprimalpea">帮忙提供越南语翻译</string>
 
-    <string name="about_opensource_title">开源许可证</string>
     <string name="no_result">无结果</string>
 
 </resources>
