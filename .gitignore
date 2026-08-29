@@ -16,4 +16,6 @@
 .cxx
 .idea
 /app/build
+# AGP used to write variant metadata here; it is build output, not source.
+/app/release
 local.properties
