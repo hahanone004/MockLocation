@@ -125,6 +125,10 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
         Log.tag = "FuckLocation"
         Log.i("hooking system_server, API ${Build.VERSION.SDK_INT}")
 
+        // The zygote cannot list /data/system, so this is the first process
+        // that can actually find where the config lives.
+        step("config directory") { ConfigGateway.get().setDataPath() }
+
         step("config gateway (write)") { ConfigGateway.get().hookWillChangeBeEnabled(classLoader) }
         step("config gateway (read)") { ConfigGateway.get().hookGetTagForIntentSender(classLoader) }
         step("telephony registry") { TelephonyRegistryHooker().hookListen(classLoader) }

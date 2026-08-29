@@ -82,6 +82,10 @@ class ConfigGateway private constructor() {
             return instance!!
         }
 
+        const val SYSTEM_DIR = "/data/system"
+        const val CONFIG_DIR_PREFIX = "fuck_location"
+        const val LEGACY_CONFIG_DIR = "fuck_location_test"
+
         /** Keys that only a pre-profile config carries. */
         private val LEGACY_KEYS =
             setOf("x", "y", "offset", "eci", "pci", "tac", "earfcn", "bandwidth")
@@ -203,6 +207,12 @@ class ConfigGateway private constructor() {
 
 
     private fun writeConfigInternal(param: XC_MethodHook.MethodHookParam) {
+        if (!this::dataDir.isInitialized) {
+            Log.e("no config directory resolved, so the config cannot be saved")
+            param.result = false
+            return
+        }
+
         val jsonFile = File("$dataDir/fakeLocation.json")
 
         if (!jsonFile.exists()) {
@@ -541,22 +551,55 @@ class ConfigGateway private constructor() {
         throw IllegalArgumentException("FL: cannot resolve caller package from ${param.method}")
     }
 
-    fun setDataPath(){
-        File("/data/system").list()?.forEach {  // Try to find the existing config
-            if (it.equals("fuck_location_test")) {  // Migrate from older version
-                val randomizedPath = "/data/system/fuck_location_${generateRandomAppendix()}"
-                File("/data/system/$it").renameTo(File(randomizedPath))
-                dataDir = randomizedPath
-            } else if (it.startsWith("fuck_location")) {
-                if (this::dataDir.isInitialized) File("/data/system/$it").deleteRecursively()
-                else dataDir = "/data/system/$it"
-            }
+    /**
+     * Finds the directory the config lives in, or names a new one.
+     *
+     * The name carries a random suffix so another app cannot simply look for
+     * it, which means it has to be *discovered* by listing /data/system rather
+     * than derived. Listing that needs the system server's access to it.
+     *
+     * Called from a process without that access - a real zygote, which is where
+     * some frameworks run initZygote - the search silently came up empty and a
+     * different random name was invented every boot, so each reboot started
+     * from an empty config and left the previous one orphaned on disk. Now a
+     * failed search leaves the path unset and says so, and system_server asks
+     * again when it installs its hooks.
+     */
+    fun setDataPath() {
+        if (this::dataDir.isInitialized) return
+
+        val names = File(SYSTEM_DIR).list()
+        if (names == null) {
+            Log.w("cannot list $SYSTEM_DIR from this process, so the config directory is not " +
+                "resolvable here; system_server will resolve it")
+            return
         }
 
-        if (!this::dataDir.isInitialized) { // Not possible, we create a new config folder
-            dataDir = "/data/system/fuck_location_${generateRandomAppendix()}"
+        // The earliest builds used a fixed name, which anything could look for.
+        if (names.contains(LEGACY_CONFIG_DIR)) {
+            val randomized = newConfigDirName()
+            Log.i("migrating $LEGACY_CONFIG_DIR to $randomized")
+            File(SYSTEM_DIR, LEGACY_CONFIG_DIR).renameTo(File(SYSTEM_DIR, randomized))
         }
+
+        val existing = File(SYSTEM_DIR).list()
+            .orEmpty()
+            .filter { it.startsWith(CONFIG_DIR_PREFIX) }
+            .sorted()
+
+        // Sorted, so a device that somehow ended up with more than one keeps
+        // choosing the same one rather than alternating between them. The
+        // strays are left alone: one of them may be the config that matters,
+        // and deleting the wrong one cannot be undone.
+        if (existing.size > 1) {
+            Log.w("more than one config directory in $SYSTEM_DIR: $existing")
+        }
+
+        dataDir = "$SYSTEM_DIR/${existing.firstOrNull() ?: newConfigDirName()}"
+        Log.i("config directory: $dataDir")
     }
+
+    private fun newConfigDirName() = "${CONFIG_DIR_PREFIX}_${generateRandomAppendix()}"
 
     private fun generateRandomAppendix() : String {
         val chars = ('a'..'z') + ('A'..'Z') + ('0'..'9')
