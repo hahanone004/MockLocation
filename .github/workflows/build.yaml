@@ -2,13 +2,27 @@ name: Build
 
 on:
   push:
+    branches:
+      - '**'
     tags:
       - 'v*'
   pull_request:
   workflow_dispatch:
 
+# Pushing again supersedes the run in flight, but a tag build is producing a
+# release and has to finish.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
   build:
+    # Every branch in this repository already builds on push, so the
+    # pull_request trigger would only run the same commit twice. It still
+    # matters for pull requests opened from a fork, which no push here covers.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name != github.repository
     runs-on: ubuntu-latest
     permissions:
       contents: write
