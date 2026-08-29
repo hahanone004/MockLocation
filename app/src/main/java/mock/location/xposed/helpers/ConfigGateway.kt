@@ -112,15 +112,6 @@ class ConfigGateway private constructor() {
 
         const val SYSTEM_DIR = "/data/system"
         const val CONFIG_DIR_PREFIX = "mock_location"
-
-        /**
-         * The fixed directory the earliest builds used, before the name carried
-         * a random suffix. It keeps its old spelling on purpose: this is a path
-         * that exists on disk, not a name we are free to choose. Renaming it
-         * with the rest of the project would point the migration at a directory
-         * that has never existed anywhere.
-         */
-        const val LEGACY_CONFIG_DIR = "fuck_location_test"
         const val ROOT_UID = 0
         const val SYSTEM_UID = 1_000
         const val PHONE_UID = 1_001
@@ -912,20 +903,7 @@ class ConfigGateway private constructor() {
             return
         }
 
-        // The earliest builds used a fixed name, which anything could look for.
-        if (names.contains(LEGACY_CONFIG_DIR)) {
-            val randomized = newConfigDirName()
-            Log.i("migrating $LEGACY_CONFIG_DIR to $randomized")
-            if (!File(SYSTEM_DIR, LEGACY_CONFIG_DIR)
-                    .renameTo(File(SYSTEM_DIR, randomized))) {
-                Log.w("could not rename legacy config directory; continuing to use it")
-            }
-        }
-
-        val existing = File(SYSTEM_DIR).list()
-            .orEmpty()
-            .filter { it.startsWith(CONFIG_DIR_PREFIX) }
-            .sorted()
+        val existing = names.filter { it.startsWith(CONFIG_DIR_PREFIX) }.sorted()
 
         // Prefer a directory carrying the newest real config. Old Vector
         // startup races could leave several empty/random directories behind;
