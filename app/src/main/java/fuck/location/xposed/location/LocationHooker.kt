@@ -67,11 +67,9 @@ class LocationHooker {
             after {
                 try {
                     val packageName = ConfigGateway.get().callerPackageName(it)
-                    XposedBridge.log("FL: in getLastLocation! Caller package name: $packageName")
-
                     val profile = ConfigGateway.get().locationSpoofFor(packageName)
+
                     if (profile != null) {
-                        XposedBridge.log("FL: in whitelist! Return custom location")
 
                         lateinit var location: Location
                         lateinit var originLocation: Location
@@ -100,7 +98,9 @@ class LocationHooker {
                         location.speed = 0F
                         location.speedAccuracyMetersPerSecond = 0F
 
-                        XposedBridge.log("FL: x: ${location.latitude}, y: ${location.longitude}")
+                        XposedBridge.log(
+                            "FL: getLastLocation for $packageName -> " +
+                                "${location.latitude}, ${location.longitude}")
                         it.result = location
                     }
                 } catch (e: Exception) {
@@ -119,10 +119,8 @@ class LocationHooker {
                 // whitelist and never matched, on Android 12 either.
                 val packageName = ConfigGateway.get().callerPackageName(param)
 
-                XposedBridge.log("FL: in getCurrentLocation! Caller package name: $packageName")
-
                 if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
-                    XposedBridge.log("FL: in whiteList! Inject null...")
+                    XposedBridge.log("FL: getCurrentLocation for $packageName -> null")
                     param.result = null
                 }
             }
@@ -132,10 +130,9 @@ class LocationHooker {
             name == "registerGnssStatusCallback" && isPublic
         }.hookBefore { param ->
             val packageName = param.args[1] as String
-            XposedBridge.log("FL: in registerGnssStatusCallback (S, DLC)! Caller package name: $packageName")
 
             if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
-                XposedBridge.log("FL: in whiteList! Dropping register request...")
+                XposedBridge.log("FL: dropping registerGnssStatusCallback from $packageName")
                 param.result = null
                 return@hookBefore
             }
@@ -145,10 +142,9 @@ class LocationHooker {
             name == "registerGnssNmeaCallback" && isPublic
         }.hookBefore { param ->
             val packageName = param.args[1] as String
-            XposedBridge.log("FL: in registerGnssNmeaCallback (S, DLC)! Caller package name: $packageName")
 
             if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
-                XposedBridge.log("FL: in whiteList! Dropping register request...")
+                XposedBridge.log("FL: dropping registerGnssNmeaCallback from $packageName")
                 param.result = null
                 return@hookBefore
             }
@@ -158,10 +154,9 @@ class LocationHooker {
             name == "requestGeofence" && isPublic
         }.hookBefore { param ->
             val packageName = param.args[2] as String
-            XposedBridge.log("FL: in requestGeofence (S, DLC)! Caller package name: $packageName")
 
             if (ConfigGateway.get().locationSpoofFor(packageName) != null) {
-                XposedBridge.log("FL: in whiteList! Dropping register request...")
+                XposedBridge.log("FL: dropping requestGeofence from $packageName")
                 param.result = null
                 return@hookBefore
             }

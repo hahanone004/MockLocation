@@ -28,11 +28,9 @@ class PhoneInterfaceManagerHooker {
                 val packageName = param.args[1] as String
                 val customIMEI = "1234567891011120" // TODO: Support custom IMEI information
 
-                XposedBridge.log("FL: [Cellar] in getImeiForSlot! Caller package name: $packageName")
-
                 if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
                     param.result = customIMEI
-                    XposedBridge.log("FL: [Cellar] In whiteList! Return custom value for testing purpose: $customIMEI")
+                    XposedBridge.log("FL: [Cellar] getImeiForSlot for $packageName -> $customIMEI")
                 }
             }
         }
@@ -44,10 +42,9 @@ class PhoneInterfaceManagerHooker {
                 val packageName = param.args[1] as String
                 val customMEID = "1234567891011120" // TODO: Support custom MEID information
 
-                XposedBridge.log("FL: [Cellar] in getMeidForSlot! Caller package name: $packageName")
                 if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
                     param.result = customMEID
-                    XposedBridge.log("FL: [Cellar] In whiteList! Return custom value for testing purpose: $customMEID")
+                    XposedBridge.log("FL: [Cellar] getMeidForSlot for $packageName -> $customMEID")
                 }
             }
         }
@@ -57,11 +54,10 @@ class PhoneInterfaceManagerHooker {
         }.hookMethod {
             after { param ->
                 val packageName = param.args[0] as String
-                XposedBridge.log("FL: [Cellar] in getCellLocation! Caller package name: $packageName")
-
                 val profile = ConfigGateway.get().cellSpoofFor(packageName)
+
                 if (profile != null) {
-                    XposedBridge.log("FL: [Cellar] in whiteList! Return custom cell data information")
+                    XposedBridge.log("FL: [Cellar] getCellLocation for $packageName")
 
                     when (param.result) {
                         is CellIdentityLte -> {
@@ -86,10 +82,9 @@ class PhoneInterfaceManagerHooker {
         }.hookMethod {
             before { param ->
                 val packageName = param.args[0] as String
-                XposedBridge.log("FL: [Cellar] in getAllCellInfo! Caller package name: $packageName")
 
                 if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
-                    XposedBridge.log("FL: [Cellar] in whiteList! Return empty AllCellInfo for testing purpose.")
+                    XposedBridge.log("FL: [Cellar] getAllCellInfo for $packageName -> empty")
                     val customAllCellInfo = ArrayList<CellInfo>()
                     param.result = customAllCellInfo
                 }
@@ -101,10 +96,9 @@ class PhoneInterfaceManagerHooker {
         }.hookMethod {
             before { param ->
                 val packageName = param.args[0] as String
-                XposedBridge.log("FL: [Cellar] in getNeighboringCellInfo! Caller package name: $packageName")
 
                 if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
-                    XposedBridge.log("FL: [Cellar] in whiteList! Return empty NeighboringCellInfo for testing purpose.")
+                    XposedBridge.log("FL: [Cellar] getNeighboringCellInfo for $packageName -> empty")
                     val customNeighboringCellInfo = ArrayList<NeighboringCellInfo>()
                     param.result = customNeighboringCellInfo
                 }
@@ -115,10 +109,9 @@ class PhoneInterfaceManagerHooker {
             name == "requestCellInfoUpdateInternal" && isPublic
         }.hookBefore { param ->
             val packageName = param.args[2] as String
-            XposedBridge.log("FL: [Cellar] in requestCellInfoUpdateInternal! Caller package name: $packageName")
 
             if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
-                XposedBridge.log("FL: in whiteList! Dropping register request...")
+                XposedBridge.log("FL: [Cellar] dropping requestCellInfoUpdate from $packageName")
                 param.result = null
                 return@hookBefore
             }

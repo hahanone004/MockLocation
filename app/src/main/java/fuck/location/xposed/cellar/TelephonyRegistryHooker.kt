@@ -16,8 +16,6 @@ class TelephonyRegistryHooker {
         val clazz: Class<*> =
             classLoader.loadClass("com.android.server.TelephonyRegistry")
 
-        XposedBridge.log("FL: [Cellar] Finding method in TelephonyRegistry")
-
         findAllMethods(clazz) {
             name == "validateEventAndUserLocked" && isPrivate
         }.hookAfter { param ->
@@ -27,8 +25,6 @@ class TelephonyRegistryHooker {
             val packageName = findField(record.javaClass) {
                 name == "callingPackage"
             }.get(record) as String
-
-            XposedBridge.log("FL: [Cellar] in validateEventAndUserLocked! Caller package name: $packageName")
 
             val shouldReportOrigin = param.result as Boolean
 
@@ -148,8 +144,6 @@ class TelephonyRegistryHooker {
         findAllMethods(clazz) {
             name == "notifyCellInfoForSubscriber" && isPublic
         }.hookBefore { param ->
-            XposedBridge.log("FL: [Cellar] in notifyCellInfoForSubscriber!")
-
             val mRecordsField = findField(clazz) {
                 name == "mRecords"
             }
