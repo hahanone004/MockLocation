@@ -7,6 +7,9 @@ import android.view.Menu
 import android.view.View
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.idanatz.oneadapter.OneAdapter
@@ -43,19 +46,35 @@ class ModuleActivity : AppCompatActivity() {
         ConfigGateway.get().setCustomContext(applicationContext)
 
         binding = ActivitySelectAppsBinding.inflate(layoutInflater)
+        setContentView(binding.root)
+        setSupportActionBar(binding.toolbar)
+
         recyclerView = binding.recycler
         oneAdapter = OneAdapter(recyclerView) {
             itemModules += AppListModule(this@ModuleActivity) { this@ModuleActivity.refresh() }
             emptinessModule = EmptyListModule()
         }
 
-        recyclerView = binding.recycler
         recyclerView.layoutManager = LinearLayoutManager(this)
+        keepLastAppOffTheNavigationBar(recyclerView)
 
         refreshLayout = binding.refreshLayout
         refreshLayout.setOnRefreshListener { refresh() }.autoRefresh()
+    }
 
-        setContentView(binding.root)
+    /**
+     * The window runs edge to edge, so the list ends underneath the gesture bar
+     * unless the bottom inset is padded in. The layout's own padding is the
+     * baseline, since insets are dispatched more than once.
+     */
+    private fun keepLastAppOffTheNavigationBar(list: RecyclerView) {
+        val base = list.paddingBottom
+
+        ViewCompat.setOnApplyWindowInsetsListener(list) { view, insets ->
+            val bars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            view.updatePadding(bottom = base + bars.bottom)
+            insets
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {

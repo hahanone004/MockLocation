@@ -4,12 +4,14 @@ import android.content.Context
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
+import android.view.WindowManager
 import android.widget.EditText
 import android.widget.TextView
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import com.google.android.material.switchmaterial.SwitchMaterial
-import com.afollestad.materialdialogs.LayoutMode
 import com.afollestad.materialdialogs.MaterialDialog
-import com.afollestad.materialdialogs.bottomsheets.BottomSheet
 import com.afollestad.materialdialogs.customview.customView
 import com.afollestad.materialdialogs.customview.getCustomView
 import com.afollestad.materialdialogs.input.input
@@ -44,7 +46,7 @@ object ProfileEditors {
         val store = ConfigGateway.get().readProfileStore()
         val profile = store.profiles.firstOrNull { it.id == profileId } ?: return
 
-        MaterialDialog(context, BottomSheet(LayoutMode.WRAP_CONTENT)).show {
+        MaterialDialog(context).show {
             title(text = context.getString(R.string.dialog_location_title, profile.displayName(context)))
             customView(R.layout.dialog_location, scrollable = true, horizontalPadding = true)
 
@@ -54,6 +56,8 @@ object ProfileEditors {
             view.findViewById<EditText>(R.id.field_latitude).setText(plainNumber.format(profile.x))
             view.findViewById<EditText>(R.id.field_longitude).setText(plainNumber.format(profile.y))
             view.findViewById<EditText>(R.id.field_offset).setText(plainNumber.format(profile.offset))
+
+            keepClearOfKeyboard()
 
             positiveButton(R.string.action_save) { dialog ->
                 val fields = dialog.getCustomView()
@@ -79,7 +83,7 @@ object ProfileEditors {
         val store = ConfigGateway.get().readProfileStore()
         val profile = store.profiles.firstOrNull { it.id == profileId } ?: return
 
-        MaterialDialog(context, BottomSheet(LayoutMode.WRAP_CONTENT)).show {
+        MaterialDialog(context).show {
             title(text = context.getString(R.string.dialog_cell_title, profile.displayName(context)))
             customView(R.layout.dialog_cell, scrollable = true, horizontalPadding = true)
 
@@ -98,6 +102,8 @@ object ProfileEditors {
             linkEciFields(view.findViewById(R.id.field_eci),
                 view.findViewById(R.id.field_enodeb),
                 view.findViewById(R.id.field_sector))
+
+            keepClearOfKeyboard()
 
             positiveButton(R.string.action_save) { dialog ->
                 val fields = dialog.getCustomView()
@@ -126,7 +132,7 @@ object ProfileEditors {
         val store = ConfigGateway.get().readProfileStore()
         val profile = store.profiles.firstOrNull { it.id == profileId } ?: return
 
-        MaterialDialog(context, BottomSheet(LayoutMode.WRAP_CONTENT)).show {
+        MaterialDialog(context).show {
             title(text = context.getString(R.string.dialog_wifi_title, profile.displayName(context)))
             customView(R.layout.dialog_wifi, scrollable = true, horizontalPadding = true)
 
@@ -134,6 +140,8 @@ object ProfileEditors {
             view.findViewById<SwitchMaterial>(R.id.switch_wifi_enabled).isChecked = profile.wifiEnabled
             view.findViewById<EditText>(R.id.field_wifi_list)
                 .setText(WifiListFormat.format(profile.wifiAccessPoints))
+
+            keepClearOfKeyboard()
 
             positiveButton(R.string.action_save) { dialog ->
                 val fields = dialog.getCustomView()
@@ -169,7 +177,7 @@ object ProfileEditors {
             ?: CarrierCatalog.countries.first()
         var carrier = stored?.second
 
-        MaterialDialog(context, BottomSheet(LayoutMode.WRAP_CONTENT)).show {
+        MaterialDialog(context).show {
             title(text = context.getString(R.string.dialog_sim_title, profile.displayName(context)))
             customView(R.layout.dialog_sim, scrollable = true, horizontalPadding = true)
 
@@ -243,6 +251,7 @@ object ProfileEditors {
             view.findViewById<View>(R.id.action_regenerate).setOnClickListener { regenerate() }
 
             render()
+            keepClearOfKeyboard()
 
             positiveButton(R.string.action_save) { dialog ->
                 val fields = dialog.getCustomView()
@@ -502,6 +511,27 @@ object ProfileEditors {
         }
         sync(eNodeB, fromParts)
         sync(sector, fromParts)
+    }
+
+    /**
+     * Keeps the field being typed into above the keyboard.
+     *
+     * These editors used to be bottom sheets, which sit against the bottom of
+     * the screen and so end up entirely behind the IME. A plain dialog is moved
+     * out of the way by the window manager, and where that is left to the app -
+     * a window running edge to edge is handed the IME as an inset rather than
+     * being resized - the inset is padded into the form instead.
+     */
+    private fun MaterialDialog.keepClearOfKeyboard() {
+        window?.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+
+        val fields = getCustomView()
+        val base = fields.paddingBottom
+
+        ViewCompat.setOnApplyWindowInsetsListener(fields) { view, insets ->
+            view.updatePadding(bottom = base + insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            insets
+        }
     }
 
     private fun ProfileStore.replacing(profile: Profile): ProfileStore =
