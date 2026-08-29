@@ -35,6 +35,14 @@ val Member.isNotPublic: Boolean
 val Member.isPrivate: Boolean
     get() = Modifier.isPrivate(modifiers)
 
+/**
+ * An abstract declaration has no body, so there is nothing to hook. Walking a
+ * superclass chain reaches them easily - a concrete registration overriding an
+ * abstract base is the normal shape - and trying to hook one throws.
+ */
+val Member.isAbstract: Boolean
+    get() = Modifier.isAbstract(modifiers)
+
 // endregion
 
 // region finders

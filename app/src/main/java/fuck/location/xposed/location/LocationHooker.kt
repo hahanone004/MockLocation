@@ -45,7 +45,7 @@ class LocationHooker {
         val clazz = classLoader.loadClass("com.android.server.location.provider.LocationProviderManager")
 
         val methods = findAllMethods(clazz, findSuper = true) {
-            name == "onReportLocation"
+            name == "onReportLocation" && !isAbstract
         }
         if (methods.isEmpty()) throw NoSuchMethodException("onReportLocation in ${clazz.name}")
         val registrationsField = findField(clazz, true) { name == "mRegistrations" }
@@ -143,7 +143,7 @@ class LocationHooker {
         // of every callback.
         val owner = geofenceOwnerField(state)
         val methods = findAllMethods(state, findSuper = true) {
-            (name == "onLocationChanged" || name == "processLocation") &&
+            (name == "onLocationChanged" || name == "processLocation") && !isAbstract &&
                 parameterCount == 1 && Location::class.java.isAssignableFrom(parameterTypes[0])
         }
         if (methods.isEmpty()) {
@@ -223,8 +223,11 @@ class LocationHooker {
     private fun installRegistrationHook(registrationClass: Class<*>) {
         if (!armedRegistrationClasses.add(registrationClass)) return
         try {
+            // Not the abstract declaration on the base Registration class:
+            // findSuper reaches it, and hooking it throws because there is no
+            // body there. The concrete override is the one that runs.
             val methods = findAllMethods(registrationClass, findSuper = true) {
-                name == "acceptLocationChange" && parameterCount == 1
+                name == "acceptLocationChange" && parameterCount == 1 && !isAbstract
             }
             if (methods.isEmpty()) {
                 throw NoSuchMethodException("acceptLocationChange in ${registrationClass.name}")

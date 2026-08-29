@@ -44,6 +44,10 @@ class PhoneInterfaceManagerHooker {
         }.hookMethod {
             after { param ->
                 if (param.hasThrowable()) return@after
+                // Only replace an IMEI that was really there. An empty slot
+                // answers null, and answering it with one anyway gives the
+                // device a second radio it does not have.
+                if ((param.result as? String).isNullOrBlank()) return@after
                 val (packageName, profile) = spoofedCellProfile(param, simIdentity = true)
                     ?: return@after
                 val customIMEI = profile.deviceImei
