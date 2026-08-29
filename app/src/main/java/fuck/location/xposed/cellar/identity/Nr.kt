@@ -22,17 +22,27 @@ class Nr {
             Collection::class.java, // additionalPlmns
         )
 
+        val mcc = profile.mcc.ifBlank { cellIdentityNr.mccString }
+        val mnc = profile.mnc.ifBlank { cellIdentityNr.mncString }
+        val operator = profile.simOperatorName.ifBlank {
+            cellIdentityNr.operatorAlphaLong?.toString()
+        }
+
         val customResult = constructor.newInstance(
             profile.pci,
             profile.tac,
             profile.earfcn,
             cellIdentityNr.bands,
-            cellIdentityNr.mccString,
-            cellIdentityNr.mncString,
+            mcc,
+            mnc,
             profile.eci.toLong(),
-            cellIdentityNr.operatorAlphaLong,
-            cellIdentityNr.operatorAlphaShort,
-            cellIdentityNr.additionalPlmns
+            operator,
+            operator,
+            if (profile.mcc.isNotBlank() && profile.mnc.isNotBlank()) {
+                emptySet<String>()
+            } else {
+                cellIdentityNr.additionalPlmns
+            }
         ) as CellIdentityNr
 
         XposedBridge.log("FL: [Cellar] Returning custom result: $customResult")

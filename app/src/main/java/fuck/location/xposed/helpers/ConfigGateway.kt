@@ -476,15 +476,25 @@ class ConfigGateway private constructor() {
 
 
     @ExperimentalStdlibApi
-    fun writeProfileStore(store: ProfileStore) {
+    fun writeProfileStore(store: ProfileStore): Boolean {
         val jsonAdapter: JsonAdapter<ProfileStore> = moshi.adapter()
 
         val json: String = jsonAdapter.toJson(store)
-        universalAPICaller(json, 3)
+        try {
+            universalAPICaller(json, 3)
+        } catch (t: Throwable) {
+            // If the system_server half is absent, this falls through to the
+            // real privileged API and throws "Only shell can call it". A
+            // settings action must report failure, not take the UI process
+            // down with an InvocationTargetException.
+            Log.e("Cannot save the config; the framework side is not answering", t)
+            return false
+        }
 
         // What was just written is by definition current, so the editor never
         // reads its own change back stale.
         remember(store, SystemClock.elapsedRealtime())
+        return true
     }
 
     private fun remember(store: ProfileStore, at: Long) {

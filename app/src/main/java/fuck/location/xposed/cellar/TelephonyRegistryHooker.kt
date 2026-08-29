@@ -140,28 +140,10 @@ class TelephonyRegistryHooker {
             }
         }
 
-        // TODO: Potential breakage in stock behavior. May being used as a detection way
-        findAllMethods(clazz) {
-            name == "notifyCellInfoForSubscriber" && isPublic
-        }.hookBefore { param ->
-            val mRecordsField = findField(clazz) {
-                name == "mRecords"
-            }
-
-            val mRecords = mRecordsField.get(param.thisObject) as ArrayList<*>
-            val newRecords = arrayListOf<Any>()
-
-            mRecords.forEach { record ->
-                val packageName = findField(record.javaClass) {
-                    name == "callingPackage"
-                }.get(record) as String
-
-                if (ConfigGateway.get().cellSpoofFor(packageName) == null) {
-                    newRecords.add(record)
-                }
-            }
-
-            mRecordsField.set(param.thisObject, newRecords)
-        }
+        // Do not filter mRecords here. It is the registry's persistent listener
+        // table, shared by every telephony event. The validate hook above
+        // delivers the substituted cell callback and suppresses only that one
+        // original delivery; removing its Record would also unsubscribe the app
+        // from every later signal, service-state and call-state notification.
     }
 }

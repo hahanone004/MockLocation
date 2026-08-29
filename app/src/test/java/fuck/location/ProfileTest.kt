@@ -111,4 +111,23 @@ class ProfileTest {
         assertFalse(Profile(wifiEnabled = true).spoofsNothing)
         assertFalse(Profile(simEnabled = true).spoofsNothing)
     }
+
+    @Test
+    fun `derived device identities are stable and correctly shaped`() {
+        val profile = Profile(id = "taiwan-taoyuan")
+
+        assertEquals(profile.deviceImei, Profile(id = "taiwan-taoyuan").deviceImei)
+        assertEquals(15, profile.deviceImei.length)
+        assertTrue(profile.deviceImei.all(Char::isDigit))
+        assertEquals(0, luhnSum(profile.deviceImei) % 10)
+
+        assertEquals(profile.deviceMeid, Profile(id = "taiwan-taoyuan").deviceMeid)
+        assertEquals(14, profile.deviceMeid.length)
+        assertTrue(profile.deviceMeid.all { it in '0'..'9' || it in 'A'..'F' })
+    }
+
+    private fun luhnSum(value: String): Int = value.mapIndexed { index, character ->
+        val digit = character.digitToInt()
+        if (index % 2 == 0) digit else (digit * 2).let { it / 10 + it % 10 }
+    }.sum()
 }

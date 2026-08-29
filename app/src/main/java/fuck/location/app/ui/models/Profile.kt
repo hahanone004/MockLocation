@@ -1,5 +1,6 @@
 package fuck.location.app.ui.models
 
+import java.security.MessageDigest
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -136,6 +137,25 @@ data class Profile(
     val operatorNumeric: String
         get() = if (mcc.isBlank() || mnc.isBlank()) "" else mcc.trim() + mnc.trim()
 
+    /** A stable, 15-digit IMEI with a valid Luhn check digit. */
+    val deviceImei: String
+        get() {
+            val serial = stableDigest().take(6).joinToString("") {
+                ((it.toInt() and 0xFF) % 10).toString()
+            }
+            val body = "35693803$serial"
+            return body + imeiCheckDigit(body)
+        }
+
+    /** A stable 14-character hexadecimal MEID in the 3GPP2 manufacturer range. */
+    val deviceMeid: String
+        get() = "A00000" + stableDigest().take(4).joinToString("") {
+            "%02X".format(it.toInt() and 0xFF)
+        }
+
+    private fun stableDigest(): ByteArray = MessageDigest.getInstance("SHA-256")
+        .digest(id.toByteArray(Charsets.UTF_8))
+
     companion object {
         const val DEFAULT_ID = "default"
 
@@ -144,6 +164,15 @@ data class Profile(
 
         fun eciOf(eNodeBId: Int, sectorId: Int): Int =
             ((eNodeBId and 0xFFFFF) shl 8) or (sectorId and 0xFF)
+
+        private fun imeiCheckDigit(body: String): Int {
+            val sum = body.mapIndexed { index, character ->
+                val digit = character.digitToInt()
+                if (index % 2 == 0) digit else (digit * 2).let { it / 10 + it % 10 }
+            }.sum()
+
+            return (10 - sum % 10) % 10
+        }
     }
 }
 

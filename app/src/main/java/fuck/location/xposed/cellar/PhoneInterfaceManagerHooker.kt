@@ -26,12 +26,11 @@ class PhoneInterfaceManagerHooker {
         }.hookMethod {
             after { param ->
                 val packageName = param.args[1] as String
-                val customIMEI = "1234567891011120" // TODO: Support custom IMEI information
+                val profile = ConfigGateway.get().cellSpoofFor(packageName) ?: return@after
+                val customIMEI = profile.deviceImei
 
-                if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
-                    param.result = customIMEI
-                    XposedBridge.log("FL: [Cellar] getImeiForSlot for $packageName -> $customIMEI")
-                }
+                param.result = customIMEI
+                XposedBridge.log("FL: [Cellar] getImeiForSlot for $packageName -> $customIMEI")
             }
         }
 
@@ -40,12 +39,11 @@ class PhoneInterfaceManagerHooker {
         }.hookMethod {
             after { param ->
                 val packageName = param.args[1] as String
-                val customMEID = "1234567891011120" // TODO: Support custom MEID information
+                val profile = ConfigGateway.get().cellSpoofFor(packageName) ?: return@after
+                val customMEID = profile.deviceMeid
 
-                if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
-                    param.result = customMEID
-                    XposedBridge.log("FL: [Cellar] getMeidForSlot for $packageName -> $customMEID")
-                }
+                param.result = customMEID
+                XposedBridge.log("FL: [Cellar] getMeidForSlot for $packageName -> $customMEID")
             }
         }
 
@@ -108,12 +106,31 @@ class PhoneInterfaceManagerHooker {
             name == "requestCellInfoUpdateInternal" && isPublic
         }.hookBefore { param ->
             val packageName = param.args[2] as String
+            val profile = ConfigGateway.get().cellSpoofFor(packageName) ?: return@hookBefore
 
-            if (ConfigGateway.get().cellSpoofFor(packageName) != null) {
-                XposedBridge.log("FL: [Cellar] dropping requestCellInfoUpdate from $packageName")
-                param.result = null
-                return@hookBefore
+            val cells = ArrayList<CellInfo>()
+            if (profile.describesCell) {
+                cells.add(fuck.location.xposed.cellar.info.Lte().cellInfo(profile))
             }
+
+            // This is an asynchronous API. Merely returning from the binder
+            // method leaves the caller waiting forever; complete the callback
+            // with the same custom list getAllCellInfo reports.
+            val callback = param.args.firstOrNull { argument ->
+                argument?.javaClass?.methods?.any {
+                    it.name == "onCellInfo" && it.parameterCount == 1
+                } == true
+            } ?: throw IllegalArgumentException("no cell-info callback in ${param.method}")
+
+            val onCellInfo = callback.javaClass.methods.first {
+                it.name == "onCellInfo" && it.parameterCount == 1
+            }
+            onCellInfo.invoke(callback, cells)
+
+            XposedBridge.log(
+                "FL: [Cellar] requestCellInfoUpdate for $packageName -> ${cells.size} cell(s)"
+            )
+            param.result = null
         }
     }
 }
