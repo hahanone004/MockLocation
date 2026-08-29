@@ -117,6 +117,12 @@ class WLANHooker {
 
     @OptIn(ExperimentalStdlibApi::class)
     private fun tryHookWifiService(loader: ClassLoader, source: String): Boolean {
+        // The Wi-Fi apex starts several services - the scanner, p2p, aware,
+        // rtt - and they all share the loader that carries WifiServiceImpl, so
+        // the start hook fires once per service. There is only ever one set of
+        // hooks to install.
+        if (wifiServiceHooked) return true
+
         val wifiClazz = runCatching {
             loader.loadClass("com.android.server.wifi.WifiServiceImpl")
         }.getOrNull() ?: return false
@@ -136,6 +142,7 @@ class WLANHooker {
             Log.w("[WiFi] failed to hook connection info: $t")
         }
         failure?.let { throw it }
+        wifiServiceHooked = true
         return true
     }
 
@@ -365,6 +372,7 @@ class WLANHooker {
         const val UNSPECIFIED_BSSID = "02:00:00:00:00:00"
         const val MIN_RSSI = -127
         const val WIFI_SERVICE_PREFIX = "com.android.server.wifi."
+        @Volatile var wifiServiceHooked = false
         val hookedServiceStartMethods = ConcurrentHashMap.newKeySet<Method>()
         val hookedScanMethods = ConcurrentHashMap.newKeySet<Method>()
         val hookedConnectionMethods = ConcurrentHashMap.newKeySet<Method>()

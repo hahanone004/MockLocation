@@ -3,6 +3,7 @@ package fuck.location.xposed
 import android.annotation.SuppressLint
 import android.os.Build
 import android.os.Handler
+import android.os.Process
 import android.os.Looper
 import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.IXposedHookLoadPackage
@@ -118,7 +119,7 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 // TelephonyManager answers most of it without leaving the
                 // process. The hooks check the profile when they fire, so
                 // installing them costs an app nothing until it is configured.
-                if (!ownsProcess(lpparam)) return
+                if (!ownsProcess(lpparam) || !isApplicationProcess(lpparam)) return
 
                 step("sim identity") {
                     SimIdentityHooker().hookTelephonyManager(lpparam)
@@ -149,6 +150,32 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
         if (process.substringBefore(':') == lpparam.packageName) return true
 
         Log.d { "skipping ${lpparam.packageName} loaded into $process" }
+        return false
+    }
+
+    /**
+     * Whether this process is an app at all.
+     *
+     * Several packages are loaded into system_server - the settings providers,
+     * telecom, the fused location provider - and handleLoadPackage reports each
+     * one. Installing the app-side hooks there put a substitution keyed to one
+     * of those package names onto TelephonyManager and LocaleList for the whole
+     * of system_server, where it would have answered for everybody: assigning a
+     * profile to a settings provider could have changed the system's own locale.
+     *
+     * It also explains the "rejecting profile query" warnings. Those hooks ran
+     * while system_server was servicing some app's binder call, so
+     * Binder.getCallingUid() reported that app rather than the system, and the
+     * config channel refused to answer for a package that app does not own.
+     *
+     * An app is always at or above the first application uid, so this needs no
+     * process name to be reported correctly.
+     */
+    private fun isApplicationProcess(lpparam: XC_LoadPackage.LoadPackageParam): Boolean {
+        val uid = Process.myUid()
+        if (uid >= FIRST_APPLICATION_UID) return true
+
+        Log.d { "skipping ${lpparam.packageName}: uid $uid is not an application" }
         return false
     }
 
@@ -285,6 +312,8 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
         @Volatile var systemServerHooked = false
         val systemServerRetryScheduled = AtomicBoolean(false)
         val systemServerRetryCount = AtomicInteger(0)
+        /** Below this belongs to the platform; apps start here. */
+        const val FIRST_APPLICATION_UID = 10_000
         const val MAX_SYSTEM_SERVER_RETRIES = 6
         const val SYSTEM_SERVER_RETRY_DELAY_MS = 5_000L
     }
