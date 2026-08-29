@@ -71,7 +71,7 @@ jobs:
       - name: Upload APK
         if: startsWith(github.ref, 'refs/tags/v')
         run: |
-          apk=$(find app/build -type f -name '*.apk' | grep -E '/release/' | head -n 1)
+          apk=$(find app/build -type f -name '*.apk' ! -iname '*debug*' | head -n 1)
           test -n "$apk" || { echo 'No release APK produced'; find app/build/outputs -type f | head -50; exit 1; }
           mkdir -p release
           cp "$apk" release/app-release.apk
