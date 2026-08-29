@@ -13,7 +13,6 @@ import com.squareup.moshi.adapter
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.R
 import fuck.location.app.ui.models.LegacyFakeLocation
 import fuck.location.app.ui.models.Profile
@@ -86,8 +85,8 @@ class ConfigGateway private constructor() {
 
     @ExperimentalStdlibApi
     @SuppressLint("PrivateApi")
-    fun hookWillChangeBeEnabled(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val clazz = lpparam.classLoader.loadClass("com.android.server.am.ActivityManagerService")
+    fun hookWillChangeBeEnabled(classLoader: ClassLoader) {
+        val clazz = classLoader.loadClass("com.android.server.am.ActivityManagerService")
 
         val methods = findAllMethods(clazz, findSuper = true) {
             name == "setProcessMemoryTrimLevel" && isPublic
@@ -106,7 +105,7 @@ class ConfigGateway private constructor() {
 
     @SuppressLint("PrivateApi")
     @ExperimentalStdlibApi
-    fun hookGetTagForIntentSender(lpparam: XC_LoadPackage.LoadPackageParam) {
+    fun hookGetTagForIntentSender(classLoader: ClassLoader) {
         // Android 13 split PackageManagerService apart: the binder entry points
         // now live in the inner class IPackageManagerImpl, which inherits this
         // method from IPackageManagerBase. Looking only at PackageManagerService's
@@ -120,7 +119,7 @@ class ConfigGateway private constructor() {
 
         val methods = candidates.firstNotNullOfOrNull { className ->
             runCatching {
-                findAllMethods(lpparam.classLoader.loadClass(className), findSuper = true) {
+                findAllMethods(classLoader.loadClass(className), findSuper = true) {
                     name == "getInstallerPackageName" && parameterCount == 1
                 }.takeIf { it.isNotEmpty() }
                     ?.also { XposedBridge.log("FL: config read channel bound to $className") }

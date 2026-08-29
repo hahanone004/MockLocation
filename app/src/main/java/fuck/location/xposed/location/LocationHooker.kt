@@ -6,7 +6,6 @@ import android.util.ArrayMap
 import fuck.location.xposed.helpers.reflect.*
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.helpers.ConfigGateway
 import java.lang.Exception
 
@@ -25,8 +24,8 @@ class LocationHooker {
 
     @SuppressLint("PrivateApi")
     @ExperimentalStdlibApi
-    fun hookLastLocation(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val clazz = lpparam.classLoader.loadClass("com.android.server.location.provider.LocationProviderManager")
+    fun hookLastLocation(classLoader: ClassLoader) {
+        val clazz = classLoader.loadClass("com.android.server.location.provider.LocationProviderManager")
 
         findAllMethods(clazz) {
             name == "onReportLocation"
@@ -59,8 +58,8 @@ class LocationHooker {
 
     @OptIn(ExperimentalStdlibApi::class)
     @SuppressLint("PrivateApi")
-    fun hookDLC(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val clazz = lpparam.classLoader.loadClass("com.android.server.location.LocationManagerService")
+    fun hookDLC(classLoader: ClassLoader) {
+        val clazz = classLoader.loadClass("com.android.server.location.LocationManagerService")
 
         findAllMethods(clazz) {
             name == "getLastLocation" && isPublic

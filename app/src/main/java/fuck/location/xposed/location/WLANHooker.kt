@@ -8,14 +8,13 @@ import fuck.location.app.ui.models.FakeAccessPoint
 import fuck.location.xposed.helpers.reflect.*
 import dalvik.system.PathClassLoader
 import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.helpers.ConfigGateway
 
 class WLANHooker {
     @ExperimentalStdlibApi
     @SuppressLint("PrivateApi")
-    fun hookWifiManager(lpparam: XC_LoadPackage.LoadPackageParam) {
-        val clazz: Class<*> = lpparam.classLoader.loadClass("com.android.server.SystemServiceManager")
+    fun hookWifiManager(classLoader: ClassLoader) {
+        val clazz: Class<*> = classLoader.loadClass("com.android.server.SystemServiceManager")
 
         findAllMethods(clazz) {
             name == "loadClassFromLoader" && isPrivate && isStatic

@@ -5,7 +5,6 @@ import android.telephony.*
 import fuck.location.xposed.helpers.reflect.*
 import fuck.location.xposed.helpers.reflect.findAllMethods
 import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.cellar.identity.Lte
 import fuck.location.xposed.cellar.identity.Nr
 import fuck.location.xposed.helpers.ConfigGateway
@@ -13,9 +12,9 @@ import fuck.location.xposed.helpers.ConfigGateway
 class TelephonyRegistryHooker {
     @ExperimentalStdlibApi
     @SuppressLint("PrivateApi")
-    fun hookListen(lpparam: XC_LoadPackage.LoadPackageParam) {
+    fun hookListen(classLoader: ClassLoader) {
         val clazz: Class<*> =
-            lpparam.classLoader.loadClass("com.android.server.TelephonyRegistry")
+            classLoader.loadClass("com.android.server.TelephonyRegistry")
 
         XposedBridge.log("FL: [Cellar] Finding method in TelephonyRegistry")
 

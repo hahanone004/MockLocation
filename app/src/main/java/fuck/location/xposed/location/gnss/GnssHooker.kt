@@ -5,15 +5,14 @@ import fuck.location.xposed.helpers.reflect.findAllMethods
 import fuck.location.xposed.helpers.reflect.hookBefore
 import fuck.location.xposed.helpers.reflect.isPublic
 import de.robv.android.xposed.XposedBridge
-import de.robv.android.xposed.callbacks.XC_LoadPackage
 import fuck.location.xposed.helpers.ConfigGateway
 
 class GnssHooker {
     @OptIn(ExperimentalStdlibApi::class)
     @SuppressLint("PrivateApi")
-    fun hookGnssCallbacks(lpparam: XC_LoadPackage.LoadPackageParam) {
+    fun hookGnssCallbacks(classLoader: ClassLoader) {
         val clazz =
-            lpparam.classLoader.loadClass("com.android.server.location.gnss.GnssManagerService")
+            classLoader.loadClass("com.android.server.location.gnss.GnssManagerService")
 
         findAllMethods(clazz) {
             name == "registerGnssStatusCallback" && isPublic
