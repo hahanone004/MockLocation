@@ -83,6 +83,7 @@ class WLANHooker {
         }
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     private fun tryHookWifiService(loader: ClassLoader, source: String): Boolean {
         val wifiClazz = runCatching {
             loader.loadClass("com.android.server.wifi.WifiServiceImpl")
@@ -201,7 +202,18 @@ class WLANHooker {
                         .setBssid(connected?.bssid ?: UNSPECIFIED_BSSID)
                         .setRssi(connected?.level ?: MIN_RSSI)
                         .setNetworkId(if (connected != null) 0 else -1)
-                    if (connected != null) builder.setFrequency(connected.frequency)
+                    if (connected != null) {
+                        // Builder.setFrequency is present on newer framework
+                        // releases but absent from the compile SDK used by this
+                        // project. Resolve it at runtime so both remain valid.
+                        runCatching {
+                            builder.javaClass
+                                .getMethod("setFrequency", Int::class.javaPrimitiveType)
+                                .invoke(builder, connected.frequency)
+                        }.onFailure {
+                            XposedBridge.log("FL: [WiFi] frequency setter unavailable: $it")
+                        }
+                    }
                     param.result = builder.build()
                 } catch (t: Throwable) {
                     XposedBridge.log("FL: [WiFi] connection spoof failed, returning null: $t")

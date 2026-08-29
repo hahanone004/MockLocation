@@ -228,6 +228,7 @@ class PhoneInterfaceManagerHooker {
         else -> null
     }
 
+    @OptIn(ExperimentalStdlibApi::class)
     private fun spoofedCells(profile: Profile): ArrayList<CellInfo> = ArrayList<CellInfo>().apply {
         try {
             if (profile.describesCell) {

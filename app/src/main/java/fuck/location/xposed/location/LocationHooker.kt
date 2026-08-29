@@ -108,7 +108,9 @@ class LocationHooker {
         val state = sequenceOf(
             "com.android.server.location.geofence.GeofenceState",
             "com.android.server.location.GeofenceState",
-        ).mapNotNull { runCatching(classLoader::loadClass).getOrNull() }
+        ).mapNotNull { className ->
+            runCatching { classLoader.loadClass(className) }.getOrNull()
+        }
             .firstOrNull()
             ?: throw ClassNotFoundException("GeofenceState")
         // Resolve this once while installing. A renamed ROM field must make the
@@ -178,6 +180,7 @@ class LocationHooker {
      * The provider keeps its real registration map and executes the complete
      * stock filtering, throttling, permission and listener lifecycle pipeline.
      */
+    @OptIn(ExperimentalStdlibApi::class)
     private fun installRegistrationHook(registrationClass: Class<*>) {
         try {
             val methods = findAllMethods(registrationClass, findSuper = true) {
@@ -301,7 +304,7 @@ class LocationHooker {
         while (current != null && current != Any::class.java) {
             current.declaredFields.forEach {
                 runCatching { it.isAccessible = true }
-                    .onSuccess { fields += it }
+                    .onSuccess { fields.add(it) }
             }
             current = current.superclass
         }

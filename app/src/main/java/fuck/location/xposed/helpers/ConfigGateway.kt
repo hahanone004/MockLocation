@@ -349,6 +349,7 @@ class ConfigGateway private constructor() {
 
 
     @Synchronized
+    @OptIn(ExperimentalStdlibApi::class)
     private fun writeConfigInternal(param: XC_MethodHook.MethodHookParam) {
         if (!this::dataDir.isInitialized) {
             Log.e("no config directory resolved, so the config cannot be saved")
