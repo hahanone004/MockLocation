@@ -225,6 +225,12 @@ object DeviceEnvironment {
      * spoofed connection reports being on, so the real association belongs
      * there. Hidden networks are dropped - a scan result with no SSID is
      * nothing a profile can describe.
+     *
+     * However many there are. A scan in a busy building runs to dozens and a
+     * real one on that same device returns just as many, so capping the list
+     * would report a thinner place than the phone is standing in. It would
+     * also be a rule the hand-written list does not have: the Wi-Fi editor
+     * takes as many lines as are typed into it.
      */
     @SuppressLint("MissingPermission")
     @Suppress("DEPRECATION")
@@ -250,7 +256,6 @@ object DeviceEnvironment {
                 compareByDescending<ScanResult> { it.BSSID.equals(associated, ignoreCase = true) }
                     .thenByDescending { it.level }
             )
-            .take(MAX_ACCESS_POINTS)
             .map {
                 FakeAccessPoint(
                     ssid = it.SSID,
@@ -265,10 +270,4 @@ object DeviceEnvironment {
     private fun stated(value: Int): Int = if (value == CellInfo.UNAVAILABLE) 0 else value
 
     private const val FIX_TIMEOUT_SECONDS = 8L
-
-    /**
-     * Enough to describe a place in full - a scan in a busy building runs to
-     * dozens, and the weakest of them say little about where the phone is.
-     */
-    private const val MAX_ACCESS_POINTS = 20
 }
