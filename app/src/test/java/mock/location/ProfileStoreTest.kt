@@ -93,14 +93,21 @@ class ProfileStoreTest {
     }
 
     @Test
-    fun `a legacy profile keeps its spoofs switched on`() {
-        // The user had them configured and in use; the migration decides which
-        // apps the profile applies to, not whether it does anything.
+    fun `a legacy profile keeps the spoof it can carry`() {
+        // Location was configured and in use, and the coordinates come across
+        // with it; the migration decides which apps the profile applies to,
+        // not whether it does anything.
+        //
+        // Cell and Wi-Fi cannot come across at all: version 2 held neither
+        // MCC/MNC nor access points. Switched on with nothing behind them they
+        // are worse than off - the hooks answer with an empty tower list and an
+        // empty scan, so the app sees a device with no network while the screen
+        // says the spoof is running.
         val profile = ProfileStore.fromLegacy(LegacyFakeLocation()).defaultProfile()!!
 
         assertTrue(profile.locationEnabled)
-        assertTrue(profile.cellEnabled)
-        assertTrue(profile.wifiEnabled)
+        assertFalse(profile.cellEnabled)
+        assertFalse(profile.wifiEnabled)
     }
 
     @Test
