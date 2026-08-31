@@ -5,6 +5,7 @@ import android.app.ActivityManager
 import android.app.AndroidAppHelper
 import android.content.Context
 import android.os.Binder
+import android.os.Process
 import android.os.SystemClock
 import mock.location.BuildConfig
 import mock.location.xposed.helpers.reflect.*
@@ -83,7 +84,23 @@ class ConfigGateway private constructor() {
     /** The outcome of one query over the config channel. */
     private data class Resolution(val profile: Profile?, val answered: Boolean)
     private val cachedProfiles = ConcurrentHashMap<String, CachedProfile>()
+
+    /** Package-name lookups behind [namesAnInstalledApp], and its bound. */
+    private val installedPackages = ConcurrentHashMap<String, Boolean>()
+    private val installedPackagesCap = 1_024
+
+    /**
+     * Packages per calling uid, behind [callingPackages]. Held only briefly:
+     * a uid outlives the app that had it, so an uninstall followed by an
+     * install must not keep answering with the package that left.
+     */
+    private data class CachedPackages(val packages: List<String>, val at: Long)
+
+    private val callerPackages = ConcurrentHashMap<Int, CachedPackages>()
+    private val callerPackagesCap = 512
+    private val callerPackagesMillis = 60_000L
     private val lastServedProfiles = ConcurrentHashMap<String, String>()
+    private val lastServedProfilesCap = 1_024
 
     /* For getting started in framework. In default, it judges whether a
      * packageName is in whiteList.json or not.
@@ -234,24 +251,41 @@ class ConfigGateway private constructor() {
         param: XC_MethodHook.MethodHookParam,
         packageName: String,
     ) {
+        // Everything after a colon is the caller's own; callerMayQuery strips
+        // it before deciding, and the cache is keyed the same way. Keyed by the
+        // raw string instead, one app could take an unbounded number of slots
+        // in system_server just by varying the suffix it asks with.
+        val app = packageName.substringBefore(':')
+
         val json = try {
             readValidConfigJson()
         } catch (t: Throwable) {
-            Log.w("cannot read profile for $packageName: $t")
-            param.result = lastServedProfiles[packageName] ?: profileReadError
+            Log.w("cannot read profile for $app: $t")
+            param.result = lastServedProfiles[app] ?: profileReadError
             return
         }
 
         param.result = try {
-            val profile = parseProfileStore(json).profileFor(packageName.substringBefore(':'))
+            val profile = parseProfileStore(json).profileFor(app)
             val adapter: JsonAdapter<Profile> = moshi.adapter()
-            (profile?.let(adapter::toJson) ?: "null").also {
-                lastServedProfiles[packageName] = it
-            }
+            rememberServedProfile(app, profile?.let(adapter::toJson) ?: "null")
         } catch (t: Throwable) {
-            Log.w("cannot resolve profile for $packageName: $t")
-            lastServedProfiles[packageName] ?: profileReadError
+            Log.w("cannot resolve profile for $app: $t")
+            lastServedProfiles[app] ?: profileReadError
         }
+    }
+
+    /**
+     * Keeps [json] as the last good answer for [app] and hands it back.
+     *
+     * The bound is a backstop rather than the fix: the keys are package names
+     * now, so this only ever holds as many entries as there are apps querying.
+     */
+    private fun rememberServedProfile(app: String, json: String): String {
+        if (lastServedProfiles.size >= lastServedProfilesCap) lastServedProfiles.clear()
+        lastServedProfiles[app] = json
+
+        return json
     }
 
     private fun callerMayQuery(packageName: String): Boolean {
@@ -568,22 +602,116 @@ class ConfigGateway private constructor() {
     }
 
     /**
-     * The first argument of a hooked framework method that names an app [spoof]
-     * applies to, together with the profile it resolved to.
+     * The argument of a hooked framework method that names the calling app,
+     * together with the profile it resolved to.
      *
      * Which argument carries the calling package moves between Android releases
      * and is surrounded by feature and attribution tags that are strings too,
-     * so every one of them is offered to [spoof] and the first that answers
-     * wins. Null when no argument names an app this spoof applies to, which is
+     * so the arguments are searched rather than indexed. What decides the
+     * search is the calling uid: only a string the caller actually owns is
+     * offered to [spoof]. Taking any plausible string instead gets it wrong in
+     * both directions - an unassigned key resolves to the default profile, so a
+     * feature id would spoof an app the user had exempted, and an attribution
+     * tag that happens to name another installed app would answer with that
+     * app's profile.
+     *
+     * Where the uid names no app - a call that did not cross a binder, or one
+     * the package manager will not resolve - the argument list is all there is:
+     * strings that name an installed app are tried, and failing that the first
+     * string, that being where the calling package sits on every release seen
+     * so far. Null when nothing names an app this spoof applies to, which is
      * the signal to leave the call alone.
      */
     fun spoofedCaller(
         param: XC_MethodHook.MethodHookParam,
         spoof: (String) -> Profile?,
-    ): Pair<String, Profile>? =
-        param.args.orEmpty().filterIsInstance<String>().firstNotNullOfOrNull { candidate ->
+    ): Pair<String, Profile>? {
+        val strings = param.args.orEmpty().filterIsInstance<String>()
+        val caller = callingPackages()
+
+        val candidates = if (caller != null) {
+            // The uid on the other end of the binder settles it. Every string
+            // in the argument list was chosen by that caller, so one naming
+            // some other installed app is either a coincidence or a way to ask
+            // for that app's profile; only a name the caller owns is its own.
+            // Its packages come last so a method that carries no package
+            // argument still resolves to the app that made the call.
+            (strings.filter { it.substringBefore(':') in caller } + caller).distinct()
+        } else {
+            strings.filter(::namesAnInstalledApp).ifEmpty { strings.take(1) }
+        }
+
+        return candidates.firstNotNullOfOrNull { candidate ->
             spoof(candidate)?.let { candidate to it }
         }
+    }
+
+    /**
+     * The packages owned by the app on the other end of the current binder
+     * call, or null when there is no such app to speak of.
+     *
+     * Null covers the two cases where the uid says nothing about which app is
+     * being answered: a call made inside this process rather than across a
+     * binder, which reports this process's own uid, and a uid the package
+     * manager will not resolve. Both fall back to reading the argument list.
+     */
+    private fun callingPackages(): List<String>? {
+        val uid = Binder.getCallingUid()
+        if (uid == Process.myUid()) return null
+
+        val now = SystemClock.elapsedRealtime()
+        val cached = callerPackages[uid]
+        if (cached != null && now - cached.at < callerPackagesMillis) {
+            return cached.packages.ifEmpty { null }
+        }
+
+        val packages = packagesForUid(uid)
+        if (callerPackages.size >= callerPackagesCap) callerPackages.clear()
+        callerPackages[uid] = CachedPackages(packages, now)
+
+        return packages.ifEmpty { null }
+    }
+
+    /**
+     * Whether [candidate] is the package name of an app on this device.
+     *
+     * The answer is held because it is asked on calls an app is free to make in
+     * a tight loop and a miss costs a package manager round trip. Strings that
+     * cannot be a package name are turned away before the cache is touched,
+     * which is what stops a per-registration listener id - unique every time -
+     * from taking a slot in it for the rest of the uptime.
+     *
+     * The lookup runs as the primary user, so an app that exists only in a
+     * secondary user or a work profile reads as not installed and the caller
+     * falls back to the first string argument. That is deliberate: this module
+     * is not meant to cover multiple users.
+     */
+    private fun namesAnInstalledApp(candidate: String): Boolean {
+        val app = candidate.substringBefore(':')
+        if (app.length !in 3..255 || '.' !in app) return false
+        if (!app.all { it.isLetterOrDigit() || it == '.' || it == '_' }) return false
+
+        installedPackages[app]?.let { return it }
+
+        val context = systemContext()
+            ?: (if (this::customContext.isInitialized) customContext else null)
+            ?: return false
+
+        val installed = try {
+            context.packageManager.getApplicationInfo(app, 0)
+            true
+        } catch (_: Throwable) {
+            false
+        }
+
+        // A device holds a few hundred packages; anything past that is a sign
+        // the syntactic filter let something through, and starting over costs
+        // one round trip per real app rather than growing without end.
+        if (installedPackages.size >= installedPackagesCap) installedPackages.clear()
+        installedPackages[app] = installed
+
+        return installed
+    }
 
     @ExperimentalStdlibApi
     fun locationSpoofFor(packageName: String): Profile? =
@@ -634,11 +762,17 @@ class ConfigGateway private constructor() {
      * a switched-off default for everyone else.
      *
      * Call from the app, not from a hook: it writes, and it needs resources.
+     *
+     * Returns whether there is anything left to do: false says the migration
+     * was postponed rather than run - the framework half is not answering yet,
+     * or the whitelist would not read - and that it is worth asking again in a
+     * moment. Postponing is not an error and throws nothing, so a caller that
+     * only watches for exceptions would retire the attempt and never retry.
      */
     @ExperimentalStdlibApi
-    fun migrateWhitelistIfNeeded(context: Context) {
+    fun migrateWhitelistIfNeeded(context: Context): Boolean {
         val store = readProfileStore()
-        if (store.configVersion >= ProfileStore.CURRENT_CONFIG_VERSION) return
+        if (store.configVersion >= ProfileStore.CURRENT_CONFIG_VERSION) return true
 
         val whitelisted = try {
             readPackageList()
@@ -647,7 +781,7 @@ class ConfigGateway private constructor() {
             null
         } ?: run {
             Log.w("Cannot read the legacy whitelist; migration postponed")
-            return
+            return false
         }
 
         if (whitelisted.isEmpty()) {
@@ -663,17 +797,23 @@ class ConfigGateway private constructor() {
                     configVersion = ProfileStore.CURRENT_CONFIG_VERSION,
                 )
             )
-            return
+            return true
         }
 
         Log.i("Folding ${whitelisted.size} whitelisted package(s) into assignments")
 
-        val carried = (store.defaultProfile() ?: Profile()).copy(
+        val base = store.defaultProfile() ?: Profile()
+        val carried = base.copy(
             id = UUID.randomUUID().toString(),
             name = context.getString(R.string.profile_migrated_name),
             locationEnabled = true,
-            cellEnabled = true,
-            wifiEnabled = true,
+            // Only the spoofs this profile can actually answer with. A config
+            // coming from version 2 carries no MCC/MNC and no access points,
+            // and switching those on regardless leaves the hooks reporting an
+            // empty tower list and an empty scan - a device with no network,
+            // presented as a working spoof.
+            cellEnabled = base.describesCell,
+            wifiEnabled = base.wifiAccessPoints.isNotEmpty(),
         )
         val untouched = Profile(
             id = Profile.DEFAULT_ID,
@@ -688,6 +828,8 @@ class ConfigGateway private constructor() {
                 configVersion = ProfileStore.CURRENT_CONFIG_VERSION,
             )
         )
+
+        return true
     }
 
     /**

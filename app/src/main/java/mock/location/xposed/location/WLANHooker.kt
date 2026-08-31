@@ -230,7 +230,12 @@ class WLANHooker {
 
                 // The connected AP is the first configured one; with none
                 // configured there is nothing coherent to claim, so report the
-                // same "not associated" state the framework uses.
+                // same "not associated" state the framework uses - an empty
+                // SSID, which is what makes WifiInfo.getSSID() answer with the
+                // real WifiManager.UNKNOWN_SSID sentinel. Writing that
+                // sentinel's own text into the SSID instead would hand callers
+                // a quoted "<unknown ssid>", which reads as an association to a
+                // network of that name.
                 val connected = profile.wifiAccessPoints.firstOrNull()
 
                 Log.d {
@@ -240,7 +245,7 @@ class WLANHooker {
 
                 try {
                     val builder = WifiInfo.Builder()
-                        .setSsid((connected?.ssid ?: UNKNOWN_SSID).toByteArray())
+                        .setSsid(connected?.ssid?.toByteArray() ?: ByteArray(0))
                         .setBssid(connected?.bssid ?: UNSPECIFIED_BSSID)
                         .setRssi(connected?.level ?: MIN_RSSI)
                         .setNetworkId(if (connected != null) 0 else -1)
@@ -371,7 +376,6 @@ class WLANHooker {
     }
 
     private companion object {
-        const val UNKNOWN_SSID = "<unknown ssid>"
         const val UNSPECIFIED_BSSID = "02:00:00:00:00:00"
         const val MIN_RSSI = -127
         const val WIFI_SERVICE_PREFIX = "com.android.server.wifi."

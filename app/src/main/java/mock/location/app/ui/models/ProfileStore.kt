@@ -61,11 +61,19 @@ data class ProfileStore(
                     pci = legacy.pci,
                     earfcn = legacy.earfcn,
                     bandwidth = legacy.bandwidth,
-                    // The user had these configured and in use, so carry that
+                    // The user had this configured and in use, so carry that
                     // over; the migration decides who the profile applies to.
                     locationEnabled = true,
-                    cellEnabled = true,
-                    wifiEnabled = true,
+                    // Neither of these can be carried, because version 2 held
+                    // neither MCC/MNC nor a list of access points. Switched on
+                    // with nothing behind them they are worse than off: the
+                    // cell hooks answer with an empty tower list and the Wi-Fi
+                    // hooks with an empty scan, so the app sees a device with
+                    // no network at all while the screen says the spoof is
+                    // running. They are the user's to turn on once the fields
+                    // are filled in.
+                    cellEnabled = false,
+                    wifiEnabled = false,
                 )
             ),
             // Left at 3 so the whitelist is still folded into assignments.

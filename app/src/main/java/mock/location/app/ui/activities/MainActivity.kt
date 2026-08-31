@@ -128,15 +128,22 @@ class MainActivity : AppCompatActivity(), View.OnClickListener {
 
         thread {
             if (migrationPending.compareAndSet(true, false)) {
-                try {
+                val migrated = try {
                     ConfigGateway.get().migrateWhitelistIfNeeded(applicationContext)
                 } catch (t: Throwable) {
                     // A migration that cannot run leaves the old config in
-                    // place and is retried next launch; it must not cost the
-                    // user the settings screen.
+                    // place; it must not cost the user the settings screen.
                     Log.e("the legacy migration could not run", t)
-                    migrationPending.set(true)
+                    false
                 }
+
+                // Postponing is the quiet case and the common one - the
+                // framework half is not answering this early after a boot - and
+                // it returns rather than throws. Clearing the flag on it would
+                // retire the migration for the life of the process, so the next
+                // onResume would not pick it up once the framework arrived and
+                // the user would have to kill the app.
+                if (!migrated) migrationPending.set(true)
             }
 
             val status = frameworkStatus()

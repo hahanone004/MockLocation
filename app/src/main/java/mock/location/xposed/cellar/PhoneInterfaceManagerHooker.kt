@@ -62,9 +62,15 @@ class PhoneInterfaceManagerHooker {
         }.hookMethod {
             after { param ->
                 if (param.hasThrowable()) return@after
+                // Same rule as the IMEI above, and it matters more here: a
+                // GSM-only device has no MEID and answers null, so filling one
+                // in hands out a CDMA radio it does not have - a sharper
+                // marking than not spoofing at all.
+                if ((param.result as? String).isNullOrBlank()) return@after
                 val (packageName, profile) = spoofedCellProfile(param, simIdentity = true)
                     ?: return@after
                 val customMEID = profile.deviceMeid
+                if (customMEID.isBlank()) return@after
 
                 param.result = customMEID
                 Log.d { "[Cellar] getMeidForSlot for $packageName -> $customMEID" }

@@ -56,11 +56,13 @@ class GnssHooker {
 
     @OptIn(ExperimentalStdlibApi::class)
     private fun disableForSpoofedApp(param: de.robv.android.xposed.XC_MethodHook.MethodHookParam) {
-        // Signatures and package-name indices differ between Android releases.
-        // Pick the string argument that actually resolves to a spoofed app.
-        val packageName = param.args.filterIsInstance<String>().firstOrNull {
-            ConfigGateway.get().locationSpoofFor(it) != null
-        } ?: return
+        // Signatures and package-name indices differ between Android releases,
+        // so the caller is searched for rather than indexed. Going through
+        // spoofedCaller keeps the attribution tags and listener ids that sit
+        // beside it from resolving to the default profile and suppressing GNSS
+        // for an app the user exempted.
+        val (packageName, _) = ConfigGateway.get()
+            .spoofedCaller(param) { ConfigGateway.get().locationSpoofFor(it) } ?: return
 
         Log.d { "disabling ${param.method.name} for $packageName" }
         val returnType = (param.method as Method).returnType

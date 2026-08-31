@@ -668,7 +668,13 @@ object ProfileEditors {
                         current.profiles.firstOrNull { it.id == id }
                     } ?: current.defaultProfile() ?: return@save
                     offerTargetScope(context, selected, packageName) {
-                        offerPlayServices(context, selected, packageName, onChanged)
+                        offerPlayServices(
+                            context,
+                            selected,
+                            packageName,
+                            followDefault = selectedId == null,
+                            onChanged,
+                        )
                     }
                 }
             }
@@ -729,17 +735,31 @@ object ProfileEditors {
      * the profile is right, the assignment is right, and the position never
      * changes. Only worth raising for a profile that actually spoofs location,
      * and worth saying plainly that it is not confined to the one app.
+     *
+     * [followDefault] carries how the app itself was assigned, because Play
+     * Services has to be given the same kind of assignment and not merely the
+     * same profile. Pinning it to whichever profile is default today would hold
+     * it there after the default moves, leaving the app on one profile and the
+     * service answering for it on another.
      */
     private fun offerPlayServices(
         context: Context,
         profile: Profile,
         justAssigned: String,
+        followDefault: Boolean,
         onChanged: () -> Unit,
     ) {
         if (!profile.locationEnabled || justAssigned == PLAY_SERVICES) return
 
         val store = ConfigGateway.get().readProfileStore()
-        if (store.assignments[PLAY_SERVICES] == profile.id) return
+        // What Play Services resolves to, not what is written down for it: with
+        // both it and the app following the default there is nothing to fix,
+        // and asking anyway would turn a matching pair into a pinned one.
+        if (store.profileFor(PLAY_SERVICES)?.id == profile.id &&
+            store.assignments.containsKey(PLAY_SERVICES) != followDefault
+        ) {
+            return
+        }
         if (!isInstalled(context, PLAY_SERVICES)) return
 
         MaterialDialog(context).show {
@@ -747,12 +767,13 @@ object ProfileEditors {
             message(R.string.play_services_message)
             positiveButton(R.string.play_services_assign) {
                 val current = ConfigGateway.get().readProfileStore()
+                val assignments = if (followDefault) {
+                    current.assignments - PLAY_SERVICES
+                } else {
+                    current.assignments + (PLAY_SERVICES to profile.id)
+                }
 
-                save(context,
-                    current.copy(
-                        assignments = current.assignments + (PLAY_SERVICES to profile.id)
-                    )
-                ) { onChanged() }
+                save(context, current.copy(assignments = assignments)) { onChanged() }
             }
             negativeButton(R.string.action_not_now)
         }

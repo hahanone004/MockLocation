@@ -127,10 +127,15 @@ class ModuleActivity : AppCompatActivity() {
 
     /** The whole list, labels and icons alike. Pull to refresh, and on entry. */
     private fun refresh() {
-        val generation = renderGeneration.incrementAndGet()
         thread {
             updateInstalledPackages()
-            render(searchKeyword, generation)
+            // Claimed after the load rather than before it. A keystroke while
+            // the packages are being read would otherwise leave this render
+            // stale on arrival and it would be dropped, so the freshly loaded
+            // list sat behind the pre-refresh one until the user typed again.
+            // The keyword is read at the same moment, so a search in flight is
+            // honoured rather than undone.
+            render(searchKeyword, renderGeneration.incrementAndGet())
             runOnMainThread { refreshLayout.finishRefresh() }
         }
     }
@@ -148,7 +153,6 @@ class ModuleActivity : AppCompatActivity() {
      * label changed in place is invisible to it.
      */
     private fun refreshAssignments() {
-        val generation = renderGeneration.incrementAndGet()
         thread {
             val store = ConfigGateway.get().readProfileStore()
 
@@ -160,7 +164,9 @@ class ModuleActivity : AppCompatActivity() {
                     ProfileEditors.assignmentLabel(this, store, model.packageName),
                 )
             }
-            render(searchKeyword, generation)
+            // Claimed after the labels are rebuilt, for the reason given in
+            // [refresh].
+            render(searchKeyword, renderGeneration.incrementAndGet())
         }
     }
 
