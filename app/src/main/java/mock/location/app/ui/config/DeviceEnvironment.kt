@@ -81,11 +81,23 @@ object DeviceEnvironment {
      * it, and a captured profile with two of the three filled in is worth more
      * than nothing at all.
      */
-    fun capture(context: Context): Capture = Capture(
-        location = currentLocation(context),
-        cell = servingCell(context),
-        accessPoints = visibleAccessPoints(context),
-    )
+    fun capture(context: Context): Capture {
+        val capture = Capture(
+            location = currentLocation(context),
+            cell = servingCell(context),
+            accessPoints = visibleAccessPoints(context),
+        )
+
+        // One line naming what the device gave up, so a capture that comes back
+        // half empty can be read out of logcat rather than guessed at.
+        Log.i(
+            "captured position=${capture.location != null}" +
+                " cell=${capture.cell != null}" +
+                " accessPoints=${capture.accessPoints.size}"
+        )
+
+        return capture
+    }
 
     /**
      * [profile] with everything [capture] found written into it, and the spoofs
@@ -124,37 +136,64 @@ object DeviceEnvironment {
     }
 
     /**
-     * A fix, asked of each enabled provider in turn and falling back to the
-     * last one any of them recorded.
+     * Where the phone is.
      *
-     * The fused provider first: it is the one that answers indoors. A stale fix
-     * still describes a place the phone has been, which is a better starting
-     * point for a profile than nothing.
+     * A fix recorded moments ago already answers the question and costs a
+     * lookup, so it is taken before any provider is made to go and find out.
+     * Failing that each provider is asked in turn - the fused one first, being
+     * the one that answers indoors - and failing that even a stale fix is
+     * returned: somewhere the phone has been beats nowhere at all as a place to
+     * start a profile from.
+     *
+     * No provider is skipped for being disabled. Asking and catching is the
+     * same cost, and a check that quietly answered "none of them" used to leave
+     * both the fix and the fallback iterating over an empty list, which came
+     * back as no position and no reason for it.
      */
-    @SuppressLint("MissingPermission")
     private fun currentLocation(context: Context): Location? {
-        val manager = context.getSystemService(LocationManager::class.java) ?: return null
-        val providers = listOf(
-            LocationManager.FUSED_PROVIDER,
-            LocationManager.GPS_PROVIDER,
-            LocationManager.NETWORK_PROVIDER,
-        ).filter {
-            try {
-                manager.isProviderEnabled(it)
-            } catch (t: Throwable) {
-                false
+        val manager = context.getSystemService(LocationManager::class.java) ?: run {
+            Log.w("this device has no location manager to read")
+            return null
+        }
+
+        val known = lastKnownLocation(manager)
+        val age = known?.let { System.currentTimeMillis() - it.time }
+        if (known != null && age != null && age < RECENT_FIX_MILLIS) {
+            Log.i("position taken from a ${age / 1_000}s old fix on ${known.provider}")
+            return known
+        }
+
+        FIX_PROVIDERS.forEach { provider ->
+            freshFix(manager, provider)?.let {
+                Log.i("position taken from $provider")
+                return it
             }
         }
 
-        providers.forEach { provider ->
-            freshFix(manager, provider)?.let { return it }
+        if (known == null) {
+            Log.w("no provider would give a position and none had one on record")
+        } else {
+            Log.i("position taken from a stale fix on ${known.provider}")
+        }
+
+        return known
+    }
+
+    /** The newest position any provider still has on record. */
+    @SuppressLint("MissingPermission")
+    private fun lastKnownLocation(manager: LocationManager): Location? {
+        val providers = try {
+            manager.allProviders
+        } catch (t: Throwable) {
+            Log.w("cannot list the location providers: $t")
+            FIX_PROVIDERS
         }
 
         return providers.mapNotNull {
             try {
                 manager.getLastKnownLocation(it)
             } catch (t: Throwable) {
-                Log.w("no last known location from $it: $t")
+                Log.d { "no last known position from $it: $t" }
                 null
             }
         }.maxByOrNull { it.time }
@@ -172,7 +211,10 @@ object DeviceEnvironment {
                 fix.set(it)
                 arrived.countDown()
             }
-            if (!arrived.await(FIX_TIMEOUT_SECONDS, TimeUnit.SECONDS)) cancellation.cancel()
+            if (!arrived.await(FIX_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                Log.w("$provider did not answer within ${FIX_TIMEOUT_SECONDS}s")
+                cancellation.cancel()
+            }
             fix.get()
         } catch (t: Throwable) {
             Log.w("cannot take a fix from $provider: $t")
@@ -269,5 +311,18 @@ object DeviceEnvironment {
 
     private fun stated(value: Int): Int = if (value == CellInfo.UNAVAILABLE) 0 else value
 
-    private const val FIX_TIMEOUT_SECONDS = 8L
+    /**
+     * Asked in this order, and only these: the passive provider would sit out
+     * the whole timeout waiting for another app to ask for a fix.
+     */
+    private val FIX_PROVIDERS = listOf(
+        LocationManager.FUSED_PROVIDER,
+        LocationManager.GPS_PROVIDER,
+        LocationManager.NETWORK_PROVIDER,
+    )
+
+    private const val FIX_TIMEOUT_SECONDS = 6L
+
+    /** How recent a recorded fix has to be to stand in for a fresh one. */
+    private const val RECENT_FIX_MILLIS = 2 * 60 * 1000L
 }

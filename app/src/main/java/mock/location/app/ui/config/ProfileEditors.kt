@@ -450,11 +450,16 @@ object ProfileEditors {
                 save(context,
                     current.copy(profiles = current.profiles + created)
                 ) {
-                    onChanged()
-                    dialog.dismiss()
+                    // Shown before this one is dismissed, and before the change
+                    // is reported. The list underneath rebuilds itself the
+                    // moment it regains window focus, so it must not regain it
+                    // in the gap between two dialogs - it would come back on
+                    // top of the one just opened.
                     offerDeviceEnvironment(context, created.id, onChanged) {
                         profileActions(context, created.id, onChanged)
                     }
+                    dialog.dismiss()
+                    onChanged()
                 }
             }
             negativeButton(R.string.action_discard) { it.dismiss() }
@@ -488,12 +493,13 @@ object ProfileEditors {
             positiveButton(R.string.device_capture_action) { dialog ->
                 if (!requestCaptureAccess(context)) return@positiveButton
 
-                dialog.dismiss()
+                // The progress dialog goes up first, for the same reason.
                 captureIntoProfile(context, profileId, onChanged, afterwards)
+                dialog.dismiss()
             }
             negativeButton(R.string.device_capture_manual) {
-                it.dismiss()
                 afterwards()
+                it.dismiss()
             }
         }
     }
@@ -542,16 +548,20 @@ object ProfileEditors {
             val capture = DeviceEnvironment.capture(context)
 
             runOnMainThread {
-                progress.dismiss()
                 if (capture.isEmpty) {
                     Toast.makeText(context, R.string.device_capture_empty, Toast.LENGTH_LONG).show()
                     afterwards()
+                    progress.dismiss()
                     return@runOnMainThread
                 }
 
                 val store = ConfigGateway.get().readProfileStore()
                 val profile = store.profiles.firstOrNull { it.id == profileId }
-                    ?: return@runOnMainThread afterwards()
+                    ?: run {
+                        afterwards()
+                        progress.dismiss()
+                        return@runOnMainThread
+                    }
                 val filled = DeviceEnvironment.applyTo(profile, capture)
 
                 save(
@@ -571,6 +581,7 @@ object ProfileEditors {
                     ).show()
                     afterwards()
                 }
+                progress.dismiss()
             }
         }
     }
