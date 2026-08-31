@@ -267,8 +267,8 @@ object DeviceEnvironment {
     private const val FIX_TIMEOUT_SECONDS = 8L
 
     /**
-     * Enough to describe a place without turning the Wi-Fi editor into a wall
-     * of text; the scan in a busy building runs to dozens.
+     * Enough to describe a place in full - a scan in a busy building runs to
+     * dozens, and the weakest of them say little about where the phone is.
      */
-    private const val MAX_ACCESS_POINTS = 8
+    private const val MAX_ACCESS_POINTS = 20
 }
