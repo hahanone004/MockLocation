@@ -136,19 +136,23 @@ object DeviceEnvironment {
     }
 
     /**
-     * Where the phone is.
+     * Where the phone is right now.
      *
-     * A fix recorded moments ago already answers the question and costs a
-     * lookup, so it is taken before any provider is made to go and find out.
-     * Failing that each provider is asked in turn - the fused one first, being
-     * the one that answers indoors - and failing that even a stale fix is
-     * returned: somewhere the phone has been beats nowhere at all as a place to
-     * start a profile from.
+     * Only a fix taken during this capture counts. A position on record is not
+     * asked for and not fallen back to: it describes where the phone was, which
+     * is a different place, and a profile built on it would put the user
+     * somewhere they have already left - silently, since nothing about the
+     * result says how old it is.
      *
-     * No provider is skipped for being disabled. Asking and catching is the
-     * same cost, and a check that quietly answered "none of them" used to leave
-     * both the fix and the fallback iterating over an empty list, which came
-     * back as no position and no reason for it.
+     * The providers are asked in turn and the best answer wins rather than the
+     * first: the fused provider usually replies at once, but from Wi-Fi alone
+     * that reply can be a hundred metres wide, and GPS is worth waiting for
+     * when it is. Asking stops early once an answer is precise enough to make
+     * the rest pointless.
+     *
+     * No provider is skipped for being disabled - asking and catching costs the
+     * same, and a check that quietly answered "none of them" would come back as
+     * no position and no reason for it.
      */
     private fun currentLocation(context: Context): Location? {
         val manager = context.getSystemService(LocationManager::class.java) ?: run {
@@ -156,48 +160,31 @@ object DeviceEnvironment {
             return null
         }
 
-        val known = lastKnownLocation(manager)
-        val age = known?.let { System.currentTimeMillis() - it.time }
-        if (known != null && age != null && age < RECENT_FIX_MILLIS) {
-            Log.i("position taken from a ${age / 1_000}s old fix on ${known.provider}")
-            return known
-        }
-
+        val fixes = mutableListOf<Location>()
         FIX_PROVIDERS.forEach { provider ->
-            freshFix(manager, provider)?.let {
+            val fix = freshFix(manager, provider) ?: return@forEach
+            Log.i("$provider answered to within ${accuracyOf(fix)}m")
+            fixes.add(fix)
+
+            if (fix.hasAccuracy() && fix.accuracy <= GOOD_ACCURACY_METRES) {
                 Log.i("position taken from $provider")
-                return it
+                return fix
             }
         }
 
-        if (known == null) {
-            Log.w("no provider would give a position and none had one on record")
+        val best = fixes.minByOrNull { accuracyOf(it) }
+        if (best == null) {
+            Log.w("no provider would give a position; nothing on record is used instead")
         } else {
-            Log.i("position taken from a stale fix on ${known.provider}")
+            Log.i("position taken from ${best.provider} to within ${accuracyOf(best)}m")
         }
 
-        return known
+        return best
     }
 
-    /** The newest position any provider still has on record. */
-    @SuppressLint("MissingPermission")
-    private fun lastKnownLocation(manager: LocationManager): Location? {
-        val providers = try {
-            manager.allProviders
-        } catch (t: Throwable) {
-            Log.w("cannot list the location providers: $t")
-            FIX_PROVIDERS
-        }
-
-        return providers.mapNotNull {
-            try {
-                manager.getLastKnownLocation(it)
-            } catch (t: Throwable) {
-                Log.d { "no last known position from $it: $t" }
-                null
-            }
-        }.maxByOrNull { it.time }
-    }
+    /** An unstated accuracy sorts last, being the one that promises nothing. */
+    private fun accuracyOf(location: Location): Float =
+        if (location.hasAccuracy()) location.accuracy else Float.MAX_VALUE
 
     @SuppressLint("MissingPermission")
     private fun freshFix(manager: LocationManager, provider: String): Location? {
@@ -321,8 +308,18 @@ object DeviceEnvironment {
         LocationManager.NETWORK_PROVIDER,
     )
 
-    private const val FIX_TIMEOUT_SECONDS = 6L
+    /**
+     * Long enough for GPS to come back from a cold start indoors. This is a
+     * deliberate wait: the profile is built once and lived in afterwards, so
+     * seconds spent here buy a position that does not have to be corrected by
+     * hand later.
+     */
+    private const val FIX_TIMEOUT_SECONDS = 12L
 
-    /** How recent a recorded fix has to be to stand in for a fresh one. */
-    private const val RECENT_FIX_MILLIS = 2 * 60 * 1000L
+    /**
+     * Close enough to stop asking. A fix this tight names the building; going
+     * on to wait out GPS for the sake of a few metres would only make the user
+     * watch a spinner.
+     */
+    private const val GOOD_ACCURACY_METRES = 50f
 }
