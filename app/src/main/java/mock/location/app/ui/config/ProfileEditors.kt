@@ -571,14 +571,20 @@ object ProfileEditors {
                     ),
                 ) {
                     onChanged()
-                    Toast.makeText(
-                        context,
-                        context.getString(
-                            R.string.device_capture_done,
-                            captureSummary(context, capture),
-                        ),
-                        Toast.LENGTH_LONG,
-                    ).show()
+                    val done = context.getString(
+                        R.string.device_capture_done,
+                        captureSummary(context, capture),
+                    )
+                    // Cells were named but none of them LTE, which is not the
+                    // same as the modem having said nothing - worth telling
+                    // apart, since only one of the two is worth retrying.
+                    val note = if (capture.cell == null && capture.cellsWithoutLte) {
+                        "\n" + context.getString(R.string.device_capture_no_lte)
+                    } else {
+                        ""
+                    }
+
+                    Toast.makeText(context, done + note, Toast.LENGTH_LONG).show()
                     afterwards()
                 }
                 progress.dismiss()

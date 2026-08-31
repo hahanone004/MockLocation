@@ -152,4 +152,5 @@
     <string name="device_capture_part_cell">cell</string>
     <string name="device_capture_part_wifi">Wi-Fi (%1$d)</string>
     <string name="device_capture_separator">, </string>
+    <string name="device_capture_no_lte">No LTE cell was in range - a phone on 5G alone names none - so the cell was left empty.</string>
 </resources>

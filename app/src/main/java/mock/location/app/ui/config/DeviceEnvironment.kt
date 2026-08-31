@@ -64,6 +64,13 @@ object DeviceEnvironment {
         val location: Location? = null,
         val cell: Cell? = null,
         val accessPoints: List<FakeAccessPoint> = emptyList(),
+        /**
+         * The modem named cells but none of them LTE, which is what a phone on
+         * 5G alone reports. Worth saying out loud: a profile describes an LTE
+         * cell and there was nothing to put in it, which is a different thing
+         * from the modem having said nothing at all.
+         */
+        val cellsWithoutLte: Boolean = false,
     ) {
         val isEmpty: Boolean
             get() = location == null && cell == null && accessPoints.isEmpty()
@@ -82,9 +89,14 @@ object DeviceEnvironment {
      * than nothing at all.
      */
     fun capture(context: Context): Capture {
+        // The cell first: it is what the modem is doing at this moment, and
+        // waiting out the providers before asking would read a state up to
+        // half a minute old.
+        val reading = readCell(context)
         val capture = Capture(
+            cell = reading.cell,
+            cellsWithoutLte = reading.cell == null && reading.sawCells,
             location = currentLocation(context),
-            cell = servingCell(context),
             accessPoints = visibleAccessPoints(context),
         )
 
@@ -138,11 +150,12 @@ object DeviceEnvironment {
     /**
      * Where the phone is right now.
      *
-     * Only a fix taken during this capture counts. A position on record is not
-     * asked for and not fallen back to: it describes where the phone was, which
-     * is a different place, and a profile built on it would put the user
-     * somewhere they have already left - silently, since nothing about the
-     * result says how old it is.
+     * Only a position from the last minute counts. One taken a minute ago is
+     * the current one in every sense that matters, and indoors it is often the
+     * only one there is - the providers can sit out their whole timeout and
+     * come back with nothing. Older than that is refused outright: it describes
+     * where the phone was, which is a different place, and nothing about the
+     * result would say so.
      *
      * The providers are asked in turn and the best answer wins rather than the
      * first: the fused provider usually replies at once, but from Wi-Fi alone
@@ -160,6 +173,15 @@ object DeviceEnvironment {
             return null
         }
 
+        // A fresh enough reading that is already precise answers the question
+        // outright; anything less and the providers are still worth asking, in
+        // case one of them does better.
+        val onRecord = currentFixOnRecord(manager)
+        if (onRecord != null && accuracyOf(onRecord) <= GOOD_ACCURACY_METRES) {
+            Log.i("position taken from ${onRecord.provider}, recorded moments ago")
+            return onRecord
+        }
+
         val fixes = mutableListOf<Location>()
         FIX_PROVIDERS.forEach { provider ->
             val fix = freshFix(manager, provider) ?: return@forEach
@@ -172,14 +194,44 @@ object DeviceEnvironment {
             }
         }
 
-        val best = fixes.minByOrNull { accuracyOf(it) }
+        val best = (fixes + listOfNotNull(onRecord)).minByOrNull { accuracyOf(it) }
         if (best == null) {
-            Log.w("no provider would give a position; nothing on record is used instead")
+            Log.w("no provider would give a position and none was recorded in the last minute")
         } else {
             Log.i("position taken from ${best.provider} to within ${accuracyOf(best)}m")
         }
 
         return best
+    }
+
+    /**
+     * The newest position any provider has on record, if it is recent enough to
+     * still be where the phone is.
+     */
+    @SuppressLint("MissingPermission")
+    private fun currentFixOnRecord(manager: LocationManager): Location? {
+        val providers = try {
+            manager.allProviders
+        } catch (t: Throwable) {
+            FIX_PROVIDERS
+        }
+
+        val newest = providers.mapNotNull {
+            try {
+                manager.getLastKnownLocation(it)
+            } catch (t: Throwable) {
+                Log.d { "no position on record from $it: $t" }
+                null
+            }
+        }.maxByOrNull { it.time } ?: return null
+
+        val age = System.currentTimeMillis() - newest.time
+        if (age > CURRENT_FIX_MILLIS) {
+            Log.i("the newest position on record is ${age / 1_000}s old, too old to use")
+            return null
+        }
+
+        return newest
     }
 
     /** An unstated accuracy sorts last, being the one that promises nothing. */
@@ -211,31 +263,54 @@ object DeviceEnvironment {
         }
     }
 
+    /** What the modem had to say, and whether it said anything at all. */
+    private data class CellReading(val cell: Cell?, val sawCells: Boolean)
+
     /**
      * The LTE cell this phone is camped on.
+     *
+     * The modem is asked to take a fresh reading rather than being taken at its
+     * last word: getAllCellInfo on its own hands back whatever was last pushed
+     * up, which after a screen-off or a network change can be stale or empty.
+     * Its own answer is still the fallback, for a build where the request goes
+     * unanswered.
      *
      * Registered cells first - the neighbours are in the same list and any of
      * them would be a cell the phone can see but is not on. Fields the modem
      * would not state come back as UNAVAILABLE and are stored as zero, which is
      * what an unconfigured profile holds.
+     *
+     * Only LTE is read, because only LTE is what a profile can hold: its
+     * identity fields are TAC, ECI, PCI and EARFCN. A phone on 5G alone names
+     * no LTE cell at all, and that case is reported rather than left as an
+     * empty result that looks like a failure.
      */
     @SuppressLint("MissingPermission")
-    private fun servingCell(context: Context): Cell? {
-        val manager = context.getSystemService(TelephonyManager::class.java) ?: return null
+    private fun readCell(context: Context): CellReading {
+        val manager = context.getSystemService(TelephonyManager::class.java) ?: run {
+            Log.w("this device has no telephony manager to read")
+            return CellReading(null, sawCells = false)
+        }
 
-        val cells = try {
-            manager.allCellInfo.orEmpty()
-        } catch (t: Throwable) {
-            Log.w("cannot read the serving cell: $t")
-            return null
+        val cells = refreshedCellInfo(manager)
+        if (cells.isEmpty()) {
+            Log.w("the modem named no cells at all")
+            return CellReading(null, sawCells = false)
         }
 
         val lte = cells.filterIsInstance<CellInfoLte>()
             .sortedByDescending { it.isRegistered }
-            .firstOrNull() ?: return null
-        val identity = lte.cellIdentity
+            .firstOrNull()
+        if (lte == null) {
+            Log.w(
+                "no LTE among the ${cells.size} cell(s) named: " +
+                    cells.joinToString { it.javaClass.simpleName }
+            )
+            return CellReading(null, sawCells = true)
+        }
 
-        return Cell(
+        val identity = lte.cellIdentity
+        val cell = Cell(
             mcc = identity.mccString.orEmpty(),
             mnc = identity.mncString.orEmpty(),
             tac = stated(identity.tac),
@@ -244,6 +319,55 @@ object DeviceEnvironment {
             earfcn = stated(identity.earfcn),
             bandwidth = stated(identity.bandwidth),
         )
+        Log.i(
+            "cell read as ${cell.mcc}/${cell.mnc} eci=${cell.eci} tac=${cell.tac}" +
+                " pci=${cell.pci} earfcn=${cell.earfcn} bandwidth=${cell.bandwidth}"
+        )
+
+        return CellReading(cell, sawCells = true)
+    }
+
+    /**
+     * A reading taken now, falling back to the last one the modem pushed up.
+     */
+    @SuppressLint("MissingPermission")
+    private fun refreshedCellInfo(manager: TelephonyManager): List<CellInfo> {
+        val refreshed = AtomicReference<List<CellInfo>?>(null)
+        val arrived = CountDownLatch(1)
+        val executor = Executors.newSingleThreadExecutor()
+
+        try {
+            manager.requestCellInfoUpdate(
+                executor,
+                object : TelephonyManager.CellInfoCallback() {
+                    override fun onCellInfo(cellInfo: MutableList<CellInfo>) {
+                        refreshed.set(cellInfo)
+                        arrived.countDown()
+                    }
+
+                    override fun onError(errorCode: Int, detail: Throwable?) {
+                        Log.w("the modem refused a cell reading: $errorCode $detail")
+                        arrived.countDown()
+                    }
+                },
+            )
+            if (!arrived.await(CELL_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+                Log.w("the modem did not take a reading within ${CELL_TIMEOUT_SECONDS}s")
+            }
+        } catch (t: Throwable) {
+            Log.w("cannot ask the modem for a reading: $t")
+        } finally {
+            executor.shutdown()
+        }
+
+        refreshed.get()?.takeIf { it.isNotEmpty() }?.let { return it }
+
+        return try {
+            manager.allCellInfo.orEmpty()
+        } catch (t: Throwable) {
+            Log.w("cannot read the cells the modem last reported: $t")
+            emptyList()
+        }
     }
 
     /**
@@ -322,4 +446,14 @@ object DeviceEnvironment {
      * watch a spinner.
      */
     private const val GOOD_ACCURACY_METRES = 50f
+
+    /**
+     * How long a fix may have been sitting there and still count as where the
+     * phone is. A position from within the last minute is the current one in
+     * every sense that matters, and indoors it is often the only one there is.
+     */
+    private const val CURRENT_FIX_MILLIS = 60 * 1000L
+
+    /** The modem answers in well under a second when it answers at all. */
+    private const val CELL_TIMEOUT_SECONDS = 5L
 }

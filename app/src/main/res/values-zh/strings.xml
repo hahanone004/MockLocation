@@ -144,4 +144,5 @@
     <string name="device_capture_part_cell">基站</string>
     <string name="device_capture_part_wifi">Wi-Fi（%1$d 个）</string>
     <string name="device_capture_separator">、</string>
+    <string name="device_capture_no_lte">附近没有可用的 LTE 小区（纯 5G 网络下不会有），基站未填充。</string>
 </resources>
