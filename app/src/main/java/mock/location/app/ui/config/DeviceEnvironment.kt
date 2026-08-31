@@ -150,12 +150,13 @@ object DeviceEnvironment {
     /**
      * Where the phone is right now.
      *
-     * Only a position from the last minute counts. One taken a minute ago is
-     * the current one in every sense that matters, and indoors it is often the
-     * only one there is - the providers can sit out their whole timeout and
-     * come back with nothing. Older than that is refused outright: it describes
-     * where the phone was, which is a different place, and nothing about the
-     * result would say so.
+     * A fix taken during this capture is preferred, and a position already on
+     * record is used when no provider will give one. Indoors that is the usual
+     * outcome: the providers sit out their whole timeout and come back with
+     * nothing while the phone has known where it is the whole time. A recorded
+     * position may be old, and its age is logged rather than judged - the user
+     * captures where they are standing, and the alternative on offer is no
+     * position at all.
      *
      * The providers are asked in turn and the best answer wins rather than the
      * first: the fused provider usually replies at once, but from Wi-Fi alone
@@ -173,11 +174,14 @@ object DeviceEnvironment {
             return null
         }
 
-        // A fresh enough reading that is already precise answers the question
+        // A recent reading that is already precise answers the question
         // outright; anything less and the providers are still worth asking, in
         // case one of them does better.
-        val onRecord = currentFixOnRecord(manager)
-        if (onRecord != null && accuracyOf(onRecord) <= GOOD_ACCURACY_METRES) {
+        val onRecord = fixOnRecord(manager)
+        val age = onRecord?.let { System.currentTimeMillis() - it.time }
+        if (onRecord != null && age != null &&
+            age <= CURRENT_FIX_MILLIS && accuracyOf(onRecord) <= GOOD_ACCURACY_METRES
+        ) {
             Log.i("position taken from ${onRecord.provider}, recorded moments ago")
             return onRecord
         }
@@ -194,9 +198,16 @@ object DeviceEnvironment {
             }
         }
 
-        val best = (fixes + listOfNotNull(onRecord)).minByOrNull { accuracyOf(it) }
+        // A fix taken now wins even when the record claims to be tighter: the
+        // record's accuracy describes where the phone was standing then.
+        val best = fixes.minByOrNull { accuracyOf(it) } ?: onRecord
         if (best == null) {
-            Log.w("no provider would give a position and none was recorded in the last minute")
+            Log.w("no provider would give a position and none was ever recorded")
+        } else if (best === onRecord) {
+            Log.i(
+                "position taken from ${best.provider}, recorded ${age?.div(1_000)}s ago," +
+                    " to within ${accuracyOf(best)}m"
+            )
         } else {
             Log.i("position taken from ${best.provider} to within ${accuracyOf(best)}m")
         }
@@ -204,12 +215,9 @@ object DeviceEnvironment {
         return best
     }
 
-    /**
-     * The newest position any provider has on record, if it is recent enough to
-     * still be where the phone is.
-     */
+    /** The newest position any provider still has on record, at any age. */
     @SuppressLint("MissingPermission")
-    private fun currentFixOnRecord(manager: LocationManager): Location? {
+    private fun fixOnRecord(manager: LocationManager): Location? {
         val providers = try {
             manager.allProviders
         } catch (t: Throwable) {
@@ -225,11 +233,10 @@ object DeviceEnvironment {
             }
         }.maxByOrNull { it.time } ?: return null
 
-        val age = System.currentTimeMillis() - newest.time
-        if (age > CURRENT_FIX_MILLIS) {
-            Log.i("the newest position on record is ${age / 1_000}s old, too old to use")
-            return null
-        }
+        Log.i(
+            "the newest position on record is" +
+                " ${(System.currentTimeMillis() - newest.time) / 1_000}s old"
+        )
 
         return newest
     }
@@ -448,9 +455,9 @@ object DeviceEnvironment {
     private const val GOOD_ACCURACY_METRES = 50f
 
     /**
-     * How long a fix may have been sitting there and still count as where the
-     * phone is. A position from within the last minute is the current one in
-     * every sense that matters, and indoors it is often the only one there is.
+     * How recent a recorded position has to be to be taken without asking any
+     * provider at all. Older than this it is still used, but only once the
+     * providers have been given their chance to do better.
      */
     private const val CURRENT_FIX_MILLIS = 60 * 1000L
 
