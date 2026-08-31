@@ -11,8 +11,8 @@ android {
         applicationId "mock.location"
         minSdk 36
         targetSdk 36
-        versionCode 2001
-        versionName "2.0.1"
+        versionCode 2002
+        versionName "2.0.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
