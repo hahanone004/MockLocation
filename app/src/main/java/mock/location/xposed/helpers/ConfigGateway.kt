@@ -534,6 +534,13 @@ class ConfigGateway private constructor() {
     @ExperimentalStdlibApi
     fun profileFor(packageName: String): Profile? {
         val app = packageName.substringBefore(':')
+        // The module's own app is never spoofed. It reads the device's real
+        // position, serving cell and access points to build a profile out of
+        // them, and it does so through these very hooks - answering it with a
+        // spoof would have each new profile describe the last one. It is also
+        // where the user checks what the device actually reports.
+        if (app == BuildConfig.APPLICATION_ID) return null
+
         val now = SystemClock.elapsedRealtime()
         val cached = cachedProfiles[app]
         val window = if (cached?.answered == false) unresolvedCacheMillis else cacheMillis

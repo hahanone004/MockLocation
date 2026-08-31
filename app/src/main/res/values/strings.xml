@@ -140,4 +140,16 @@
 
 
     <string name="no_result">No result</string>
+    <string name="device_capture_title">Fill in from this device</string>
+    <string name="device_capture_message">Read this phone\'s current position, serving cell and nearby access points into the new profile. They describe one place, so the profile holds together from the start. The SIM identity is not read.</string>
+    <string name="device_capture_action">Fill in</string>
+    <string name="device_capture_manual">Configure manually</string>
+    <string name="device_capture_working">Reading the device. Taking a fix can take a few seconds.</string>
+    <string name="device_capture_needs_permission">Grant location and nearby Wi-Fi access, then tap Fill in again.</string>
+    <string name="device_capture_empty">The device reported nothing to fill in. Check that location is switched on.</string>
+    <string name="device_capture_done">Filled in from this device: %1$s</string>
+    <string name="device_capture_part_location">position</string>
+    <string name="device_capture_part_cell">cell</string>
+    <string name="device_capture_part_wifi">Wi-Fi (%1$d)</string>
+    <string name="device_capture_separator">, </string>
 </resources>

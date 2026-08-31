@@ -14,6 +14,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.app.ActivityCompat
 import androidx.core.widget.ImageViewCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
@@ -30,9 +31,11 @@ import mock.location.app.ui.models.CarrierCatalog
 import mock.location.app.ui.models.Profile
 import mock.location.app.ui.models.ProfileStore
 import mock.location.xposed.helpers.ConfigGateway
+import mock.location.xposed.helpers.reflect.runOnMainThread
 import java.util.Collections
 import java.util.UUID
 import java.util.WeakHashMap
+import kotlin.concurrent.thread
 
 /**
  * The dialogs behind a profile's four spoofs and the profile library.
@@ -45,6 +48,7 @@ import java.util.WeakHashMap
 object ProfileEditors {
 
     private const val PLAY_SERVICES = "com.google.android.gms"
+    private const val CAPTURE_PERMISSIONS = 4211
     private val LTE_BANDWIDTHS = setOf(0, 1_400, 3_000, 5_000, 10_000, 15_000, 20_000)
 
     // region feature editors
@@ -448,11 +452,140 @@ object ProfileEditors {
                 ) {
                     onChanged()
                     dialog.dismiss()
-                    profileActions(context, created.id, onChanged)
+                    offerDeviceEnvironment(context, created.id, onChanged) {
+                        profileActions(context, created.id, onChanged)
+                    }
                 }
             }
             negativeButton(R.string.action_discard) { it.dismiss() }
         }
+    }
+
+    /**
+     * Offers to fill a new profile in from where the phone actually is.
+     *
+     * Assembling a profile by hand means reading a position off a map, a cell
+     * identity out of a field-test screen and a list of access points out of a
+     * scanner, and getting all three to describe the same place. The device
+     * already knows all of it, so this is offered the moment a profile is
+     * named - which is also the only moment it is empty enough for filling in
+     * to be unambiguous.
+     *
+     * The dialog does not dismiss itself: the answer may be a permission
+     * prompt, and after granting it the user is standing right where they need
+     * to be to try again.
+     */
+    private fun offerDeviceEnvironment(
+        context: Context,
+        profileId: String,
+        onChanged: () -> Unit,
+        afterwards: () -> Unit,
+    ) {
+        MaterialDialog(context).show {
+            noAutoDismiss()
+            title(R.string.device_capture_title)
+            message(R.string.device_capture_message)
+            positiveButton(R.string.device_capture_action) { dialog ->
+                if (!requestCaptureAccess(context)) return@positiveButton
+
+                dialog.dismiss()
+                captureIntoProfile(context, profileId, onChanged, afterwards)
+            }
+            negativeButton(R.string.device_capture_manual) {
+                it.dismiss()
+                afterwards()
+            }
+        }
+    }
+
+    /**
+     * Whether the device may be read, asking for what is missing if it may not.
+     *
+     * The prompt's answer is not waited on. Coming back through
+     * onRequestPermissionsResult would mean carrying the half-made profile
+     * through the activity, and the caller's dialog is still on screen, so
+     * tapping again once the prompt is answered is both simpler and where the
+     * user already is.
+     */
+    private fun requestCaptureAccess(context: Context): Boolean {
+        val missing = DeviceEnvironment.missingPermissions(context)
+        if (missing.isEmpty()) return true
+
+        (context as? Activity)?.let {
+            ActivityCompat.requestPermissions(it, missing.toTypedArray(), CAPTURE_PERMISSIONS)
+        }
+        Toast.makeText(context, R.string.device_capture_needs_permission, Toast.LENGTH_LONG).show()
+
+        return false
+    }
+
+    /**
+     * Reads the device and writes what came back into the profile.
+     *
+     * Off the main thread, because a fix waits on a satellite. The store is
+     * read again on the way back rather than captured on the way in: the read
+     * takes seconds, and the profile may have been renamed in the meantime.
+     */
+    private fun captureIntoProfile(
+        context: Context,
+        profileId: String,
+        onChanged: () -> Unit,
+        afterwards: () -> Unit,
+    ) {
+        val progress = MaterialDialog(context).show {
+            title(R.string.device_capture_title)
+            message(R.string.device_capture_working)
+            cancelable(false)
+        }
+
+        thread {
+            val capture = DeviceEnvironment.capture(context)
+
+            runOnMainThread {
+                progress.dismiss()
+                if (capture.isEmpty) {
+                    Toast.makeText(context, R.string.device_capture_empty, Toast.LENGTH_LONG).show()
+                    afterwards()
+                    return@runOnMainThread
+                }
+
+                val store = ConfigGateway.get().readProfileStore()
+                val profile = store.profiles.firstOrNull { it.id == profileId }
+                    ?: return@runOnMainThread afterwards()
+                val filled = DeviceEnvironment.applyTo(profile, capture)
+
+                save(
+                    context,
+                    store.copy(
+                        profiles = store.profiles.map { if (it.id == profileId) filled else it }
+                    ),
+                ) {
+                    onChanged()
+                    Toast.makeText(
+                        context,
+                        context.getString(
+                            R.string.device_capture_done,
+                            captureSummary(context, capture),
+                        ),
+                        Toast.LENGTH_LONG,
+                    ).show()
+                    afterwards()
+                }
+            }
+        }
+    }
+
+    /** Which of the three the device actually had to give. */
+    private fun captureSummary(context: Context, capture: DeviceEnvironment.Capture): String {
+        val parts = buildList {
+            if (capture.location != null) add(context.getString(R.string.device_capture_part_location))
+            if (capture.cell != null) add(context.getString(R.string.device_capture_part_cell))
+            if (capture.accessPoints.isNotEmpty()) {
+                add(context.getString(R.string.device_capture_part_wifi, capture.accessPoints.size))
+            }
+        }
+
+        return parts.joinToString(context.getString(R.string.device_capture_separator))
     }
 
     /** What you can do to one profile. */

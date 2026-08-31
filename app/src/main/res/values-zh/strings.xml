@@ -132,4 +132,16 @@
 
     <string name="no_result">无结果</string>
 
+    <string name="device_capture_title">用当前设备填充</string>
+    <string name="device_capture_message">读取本机当前的位置、所在基站和周围的 Wi-Fi 热点，写入新建的配置。三者描述的是同一个地点，配置从一开始就是自洽的。不会读取 SIM 卡身份。</string>
+    <string name="device_capture_action">填充</string>
+    <string name="device_capture_manual">手动配置</string>
+    <string name="device_capture_working">正在读取设备，定位可能需要几秒。</string>
+    <string name="device_capture_needs_permission">请授予位置和附近 Wi-Fi 权限，然后再次点击“填充”。</string>
+    <string name="device_capture_empty">设备没有返回可用信息，请确认已打开定位。</string>
+    <string name="device_capture_done">已根据当前设备填充：%1$s</string>
+    <string name="device_capture_part_location">位置</string>
+    <string name="device_capture_part_cell">基站</string>
+    <string name="device_capture_part_wifi">Wi-Fi（%1$d 个）</string>
+    <string name="device_capture_separator">、</string>
 </resources>

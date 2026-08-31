@@ -5,6 +5,18 @@
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
         tools:ignore="QueryAllPackagesPermission" />
 
+    <!--
+      Reading the device's own surroundings, so a new profile can start out
+      describing where the phone is. All three sources are gated on location:
+      a scan result and a serving cell disclose a position as plainly as a fix
+      does. NEARBY_WIFI_DEVICES carries no neverForLocation flag on purpose -
+      what the scan is for here is precisely the place it implies.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+
     <application
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
