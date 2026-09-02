@@ -1,6 +1,7 @@
 package mock.location.xposed.system
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.LocaleManager
 import android.content.Context
 import android.content.res.Configuration
@@ -70,6 +71,21 @@ class LocaleHooker {
     private var lastSpoofedLocale: Locale? = null
 
     /**
+     * The device's own language, read at attach before anything here changes
+     * it.
+     *
+     * This is what tells a configuration the system pushed in apart from one
+     * the app chose for itself. Only the first is ours to replace: an app that
+     * sets its own language through a configuration of its own is making a
+     * decision about itself, and overwriting it would undo an in-app language
+     * picker - the thing this class has said from the beginning it would not
+     * do. Null when it could not be read, and then everything is treated as
+     * the system's, which is the behaviour that was there before.
+     */
+    @Volatile
+    private var deviceLocales: LocaleList? = null
+
+    /**
      * Guards the lookup against itself. It crosses a binder, and what comes
      * back can drive another configuration change on this same thread.
      */
@@ -96,6 +112,9 @@ class LocaleHooker {
         install("LocaleManager", packageName) { hookLocaleManager(lpparam, packageName) }
         install("system configuration", packageName) {
             hookSystemConfiguration(lpparam, packageName)
+        }
+        install("activity resources", packageName) {
+            hookActivityAttach(lpparam, packageName)
         }
     }
 
@@ -208,9 +227,88 @@ class LocaleHooker {
         param.args.forEachIndexed { index, argument ->
             val incoming = argument as? Configuration ?: return@forEachIndexed
             if (effective == incoming.locales) return@forEachIndexed
+            // An activity's override configuration can carry a language the app
+            // chose for itself, and that one is not ours to replace.
+            if (!isTheDevices(incoming.locales)) return@forEachIndexed
 
             param.args[index] = Configuration(incoming).apply { setLocales(effective) }
         }
+    }
+
+    /**
+     * An activity's own Resources, corrected as it is handed them.
+     *
+     * Every configuration entry point can be held and an activity can still
+     * read the device's language, because its Resources are not made from a
+     * configuration going past a hook. They are built when the activity is
+     * created, out of the process' stored configuration merged with the
+     * override that belongs to that activity, and a run with all five entry
+     * points held and the stored configuration patched still read the device's
+     * language in the first foreground reading - before any rotation, so
+     * before any configuration change at all. Whatever the override carries on
+     * a given ROM, this is the point where the answer is finished and can be
+     * checked.
+     *
+     * So the language is not chased through the paths that produce it. It is
+     * corrected once, where the activity receives it, which is the same thing
+     * the install at attach does for the application's own Resources.
+     */
+    @ExperimentalStdlibApi
+    private fun hookActivityAttach(
+        lpparam: XC_LoadPackage.LoadPackageParam,
+        packageName: String,
+    ) {
+        val activityClass = lpparam.classLoader.loadClass("android.app.Activity")
+
+        val methods = findAllMethods(activityClass, findSuper = true) {
+            name == "attach" && !Modifier.isAbstract(modifiers) &&
+                parameterTypes.firstOrNull() == Context::class.java
+        }
+        if (methods.isEmpty()) {
+            Log.w("no Activity.attach in $packageName; activity resources are not held")
+            return
+        }
+
+        methods.hookAfter { param ->
+            val activity = param.thisObject as? Activity ?: return@hookAfter
+
+            runCatching { holdResources(activity.resources, packageName) }
+                .onFailure { Log.w("cannot hold the activity resources in $packageName: $it") }
+        }
+
+        Log.i("activity resources held in $packageName")
+    }
+
+    /**
+     * Puts the profile's language into [resources], if what is there now is the
+     * device's rather than the app's own.
+     */
+    @ExperimentalStdlibApi
+    @Suppress("DEPRECATION")
+    private fun holdResources(resources: Resources, packageName: String) {
+        val effective = effectiveLocales(packageName) ?: return
+
+        val current = resources.configuration.locales
+        if (current == effective || !isTheDevices(current)) return
+
+        val configuration = Configuration(resources.configuration).apply { setLocales(effective) }
+        resources.updateConfiguration(configuration, resources.displayMetrics)
+    }
+
+    /**
+     * Whether [locales] is the device's own language rather than a choice the
+     * app made for itself.
+     *
+     * An empty list counts: it means "inherit", and what it would inherit is
+     * the device's. When the device's language was never read, everything
+     * counts - substituting too eagerly is the behaviour this class already
+     * had, and it is the safer of the two directions to be wrong in for an app
+     * that has chosen nothing.
+     */
+    private fun isTheDevices(locales: LocaleList): Boolean {
+        if (locales.isEmpty) return true
+
+        return deviceLocales?.let { locales == it } ?: true
     }
 
     /**
@@ -322,6 +420,11 @@ class LocaleHooker {
         context: Context,
         localeListClass: Class<*>,
     ): Boolean {
+        // Before anything below rewrites it.
+        if (deviceLocales == null) {
+            deviceLocales = runCatching { context.resources.configuration.locales }.getOrNull()
+        }
+
         val effective = awaitLocales(packageName)
             ?: return ConfigGateway.get().profileResolved(packageName)
 
