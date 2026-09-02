@@ -110,6 +110,15 @@ jobs:
           path: ${{ startsWith(github.ref, 'refs/tags/v') && 'release/*.apk' || 'app/build/outputs/apk/debug/app-debug.apk' }}
           if-no-files-found: error
 
+      # The probe is a test tool rather than part of the release, so it rides
+      # along as an artifact on every build and is never published.
+      - name: Upload probe APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: probe-debug
+          path: probe/build/outputs/apk/debug/probe-debug.apk
+          if-no-files-found: error
+
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2

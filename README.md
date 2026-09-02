@@ -66,6 +66,55 @@ own - a profile with no cell filled in has nothing to be consistent with.
 - **Target app**: SIM identity and system language; the target app must be scoped separately.
 - **Google Play services**: usually needs the same profile when an app obtains location through Play services.
 
+## 测试探针 / Probe
+
+`:probe` 是一个独立的测试应用（包名 `mock.location.probe`），用来自动检查伪装在各种场景下
+是否始终成立。它不读模块的配置，也不知道 Profile 里填了什么——它的判定标准是**一致性**：
+同一批 API 在冷启动、前台、子线程、Activity 重建、横屏、竖屏、后台、第二个进程、以及杀掉
+进程重启之后各读一次，只要某一项在场景之间变了，就说明它来自伪装没有覆盖到的地方。
+
+用法：安装 probe，在 MockLocation 里把它分配到一个 Profile 并加入模块作用域，授予权限后
+重新打开（冷启动读数在权限对话框之前采集，首次安装那一遍的冷启动会标成「权限尚未授予」），
+点「开始测试」。报告按语言/位置/基站/Wi‑Fi/SIM
+分组，可一键复制。标着「模块未覆盖此 API」的项目是模块本来就没接管的入口，列在那里是为了
+知道它们还在说真话，不是缺陷。
+
+位置是按距离比较的，不是按字符串：Profile 的抖动半径（`offset`）本来就让每次读到的经纬度
+都不同，逐字比对会把正常工作的伪装判成漂移。探针把彼此相距 1 km 以内的定位归为同一处，并
+把每一处的实际范围一并打印出来——所以抖动半径接近这个量级时，报告会自己说清楚，而不是躲
+在结论后面。
+
+一致性检查查不出「功能整个没生效」——没伪装的读数同样是稳定的。反过来，真实的扫描结果和
+小区本来就会随时间变化，所以未分配 Profile 时看到 Wi‑Fi/基站漂移是正常的。
+
+APK 不随版本发布，每次 CI 构建作为 `probe-debug` 制品产出。
+
+`:probe` is a separate test app (`mock.location.probe`) that checks whether a spoof holds
+everywhere. It never reads the module's config and has no idea what the profile says: the
+verdict is **agreement**. The same APIs are read at cold start, in the foreground, on a
+worker thread, after an activity recreate, in landscape, in portrait, in the background, in
+a second process, and in the fresh process left behind by a deliberate kill. A reading that
+changes between any two of those came from somewhere the spoof does not cover.
+
+Install it, assign it a profile, add it to the module scope, grant the permissions and
+reopen it - the cold reading is taken before the permission dialog can be answered, so on a
+fresh install that first cold sweep records the permission rather than a value - then press
+Run. Rows marked "not hooked by the module" are entry points the module never claimed;
+they are listed so it is visible that they still tell the truth.
+
+Positions are compared by distance rather than as text. A profile with a jitter radius hands
+out a different fix every time by design, so comparing the digits would call a working spoof
+a defect. Fixes within 1 km of each other count as one place, and the measured spread of each
+place is printed beside it, so a jitter radius anywhere near that scale is visible in the
+report instead of hidden behind the verdict.
+
+Agreement cannot see a feature that is switched off entirely - an unspoofed reading is just
+as stable. And a real scan result or serving cell moves on its own, so drift in those with no
+profile assigned is the expected answer rather than a defect.
+
+The APK is not published with releases; every CI build uploads it as the `probe-debug`
+artifact.
+
 ## 注意事项 / Notes
 
 - Profile 的每个功能都可以独立开关；未开启的功能保持系统原值。

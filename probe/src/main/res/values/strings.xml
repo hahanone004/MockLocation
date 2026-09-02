@@ -1,0 +1,49 @@
+<resources>
+    <string name="app_name">MockLocation Probe</string>
+
+    <string name="hint">Assign this app to a profile in MockLocation and add it to the module scope, then run. Every scenario asks the same questions; a reading that changes between them came from somewhere the spoof does not cover.</string>
+    <string name="permissions_note">Grant the permissions and then reopen the app: the cold reading is taken before this dialog can be answered.</string>
+
+    <string name="action_run">Run</string>
+    <string name="action_run_again">Run again</string>
+    <string name="action_restart">Kill process</string>
+    <string name="action_copy">Copy report</string>
+
+    <string name="status_idle">%1$d scenarios recorded · %2$d drifted, %3$d stable</string>
+    <string name="status_done">Done · %1$d scenarios · %2$d drifted, %3$d stable</string>
+    <string name="status_running">Running %1$s · %2$d scenarios recorded</string>
+
+    <string name="group_locale">Language</string>
+    <string name="group_location">Position</string>
+    <string name="group_cell">Serving cell</string>
+    <string name="group_wifi">Access points</string>
+    <string name="group_sim">SIM identity</string>
+
+    <string name="scenario_cold">cold start</string>
+    <string name="scenario_foreground">foreground</string>
+    <string name="scenario_worker">worker thread</string>
+    <string name="scenario_recreate">recreate</string>
+    <string name="scenario_landscape">landscape</string>
+    <string name="scenario_portrait">portrait</string>
+    <string name="scenario_background">background</string>
+    <string name="scenario_remote">remote process</string>
+    <string name="scenario_restart">after restart</string>
+
+    <string name="verdict_stable">stable</string>
+    <string name="verdict_drifted">DRIFTED</string>
+    <string name="verdict_thin">one reading</string>
+    <string name="verdict_no_data">no data</string>
+
+    <string name="cluster_spread">(within %1$d m)</string>
+    <string name="cluster_separation">the places are %1$d m apart</string>
+
+    <string name="not_covered">not hooked by the module</string>
+    <string name="reading_none">nothing to report</string>
+    <string name="reading_not_granted">permission not granted yet</string>
+    <string name="reading_denied">permission refused</string>
+    <string name="reading_no_remote">the remote process did not answer</string>
+
+    <string name="report_title">MockLocation probe report</string>
+    <string name="report_counts">%1$d drifted, %2$d stable, across %3$d scenarios</string>
+    <string name="report_copied">Report copied</string>
+</resources>

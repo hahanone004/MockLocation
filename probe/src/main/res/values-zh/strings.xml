@@ -1,0 +1,49 @@
+<resources>
+    <string name="app_name">MockLocation 探针</string>
+
+    <string name="hint">先在 MockLocation 里把本应用分配到一个 Profile 并加入模块作用域，然后开始测试。每个场景问的是同一批问题；某一项在场景之间变了，就说明它来自伪装没有覆盖到的地方。</string>
+    <string name="permissions_note">授予权限后请重新打开应用：冷启动读数是在这个对话框能被回答之前采集的。</string>
+
+    <string name="action_run">开始测试</string>
+    <string name="action_run_again">重新测试</string>
+    <string name="action_restart">杀进程</string>
+    <string name="action_copy">复制报告</string>
+
+    <string name="status_idle">已采集 %1$d 个场景 · %2$d 项漂移，%3$d 项稳定</string>
+    <string name="status_done">测试完成 · %1$d 个场景 · %2$d 项漂移，%3$d 项稳定</string>
+    <string name="status_running">正在采集：%1$s · 已完成 %2$d 个场景</string>
+
+    <string name="group_locale">语言</string>
+    <string name="group_location">位置</string>
+    <string name="group_cell">基站</string>
+    <string name="group_wifi">Wi-Fi</string>
+    <string name="group_sim">SIM 身份</string>
+
+    <string name="scenario_cold">冷启动</string>
+    <string name="scenario_foreground">前台</string>
+    <string name="scenario_worker">子线程</string>
+    <string name="scenario_recreate">重建</string>
+    <string name="scenario_landscape">横屏</string>
+    <string name="scenario_portrait">竖屏</string>
+    <string name="scenario_background">后台</string>
+    <string name="scenario_remote">第二进程</string>
+    <string name="scenario_restart">重启进程后</string>
+
+    <string name="verdict_stable">一致</string>
+    <string name="verdict_drifted">漂移</string>
+    <string name="verdict_thin">仅一次读数</string>
+    <string name="verdict_no_data">无数据</string>
+
+    <string name="cluster_spread">（范围 %1$d m 内）</string>
+    <string name="cluster_separation">两处相距约 %1$d m</string>
+
+    <string name="not_covered">模块未覆盖此 API</string>
+    <string name="reading_none">没有可读的值</string>
+    <string name="reading_not_granted">权限尚未授予</string>
+    <string name="reading_denied">权限被拒绝</string>
+    <string name="reading_no_remote">第二进程没有应答</string>
+
+    <string name="report_title">MockLocation 探针报告</string>
+    <string name="report_counts">%1$d 项漂移，%2$d 项稳定，共 %3$d 个场景</string>
+    <string name="report_copied">报告已复制</string>
+</resources>

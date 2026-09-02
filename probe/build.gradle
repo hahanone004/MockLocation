@@ -1,0 +1,46 @@
+plugins {
+    id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
+}
+
+// The probe is a target app, not part of the module: it is installed
+// alongside MockLocation, assigned a profile like any other app, and asks the
+// system the questions an ordinary app would ask. It has its own applicationId
+// and its own version, and it deliberately depends on nothing from :app.
+android {
+    namespace 'mock.location.probe'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId "mock.location.probe"
+        minSdk 36
+        targetSdk 36
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildFeatures {
+        viewBinding = true
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.16.0'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'androidx.recyclerview:recyclerview:1.4.0'
+    implementation 'com.google.android.material:material:1.12.0'
+}

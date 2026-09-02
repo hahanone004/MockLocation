@@ -1,0 +1,5 @@
+<resources>
+    <color name="verdict_drifted">#EF9A9A</color>
+    <color name="verdict_stable">#A5D6A7</color>
+    <color name="verdict_thin">#BDBDBD</color>
+</resources>
