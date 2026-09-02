@@ -254,9 +254,11 @@ object ProfileEditors {
             val serial = view.findViewById<EditText>(R.id.field_sim_serial)
 
             val localeSwitch = view.findViewById<SwitchMaterial>(R.id.switch_locale_enabled)
+            val timeZoneSwitch = view.findViewById<SwitchMaterial>(R.id.switch_timezone_enabled)
 
             view.findViewById<SwitchMaterial>(R.id.switch_sim_enabled).isChecked = profile.simEnabled
             localeSwitch.isChecked = profile.localeEnabled
+            timeZoneSwitch.isChecked = profile.timeZoneEnabled
             number.setText(profile.phoneNumber)
             serial.setText(profile.simSerial)
 
@@ -268,6 +270,8 @@ object ProfileEditors {
                 // start rendering in is the whole decision being made here.
                 localeSwitch.text = context.getString(
                     R.string.switch_enable_locale, country.localeLabel)
+                timeZoneSwitch.text = context.getString(
+                    R.string.switch_enable_timezone, country.timeZoneLabel)
                 summary.text = carrier?.let {
                     context.getString(
                         R.string.sim_summary_format,
@@ -331,13 +335,16 @@ object ProfileEditors {
                 val picked = carrier
                 val simEnabled = fields.switched(R.id.switch_sim_enabled)
                 val localeEnabled = fields.switched(R.id.switch_locale_enabled)
+                val timeZoneEnabled = fields.switched(R.id.switch_timezone_enabled)
                 // The phone keypad offers +, spaces, dashes and brackets, and a
                 // pasted number brings its own formatting; the digits are the
                 // number. Rejecting the rest turned an ordinary way of typing
                 // it into a bare "invalid" toast.
                 val phoneNumber = fields.text(R.id.field_phone_number).filter(Char::isDigit)
                 val simSerial = fields.text(R.id.field_sim_serial).filter(Char::isDigit)
-                val valid = (!localeEnabled || simEnabled) && (!simEnabled ||
+                val valid = (!localeEnabled || simEnabled) &&
+                    (!timeZoneEnabled || simEnabled) &&
+                    (!timeZoneEnabled || country.timeZone.isNotBlank()) && (!simEnabled ||
                     picked != null &&
                     phoneNumber.length == country.numberLength &&
                     simSerial.length in 19..20 &&
@@ -362,6 +369,8 @@ object ProfileEditors {
                             simSerial = simSerial,
                             localeEnabled = localeEnabled,
                             localeTag = country.locale,
+                            timeZoneEnabled = timeZoneEnabled,
+                            timeZoneId = country.timeZone,
                             // The cell identity describes the same network, so
                             // the carrier decides its MCC and MNC too rather
                             // than letting the two drift apart.
@@ -372,7 +381,9 @@ object ProfileEditors {
                 ) {
                     onSaved()
                     if (profile.localeEnabled != localeEnabled ||
-                        profile.localeTag != country.locale) {
+                        profile.localeTag != country.locale ||
+                        profile.timeZoneEnabled != timeZoneEnabled ||
+                        profile.timeZoneId != country.timeZone) {
                         Toast.makeText(
                             context,
                             R.string.locale_restart_required,
@@ -681,6 +692,8 @@ object ProfileEditors {
                     profile.simOperatorName,
                     profile.localeTag.takeIf { profile.localeEnabled }
                         ?: context.getString(R.string.profile_language_unchanged),
+                    profile.timeZoneId.takeIf { profile.timeZoneEnabled }
+                        ?: context.getString(R.string.profile_timezone_unchanged),
                 )
             }
             bindFeatureRow(
@@ -856,14 +869,14 @@ object ProfileEditors {
         }
     }
 
-    /** SIM properties and locale are hooked inside the target app process. */
+    /** SIM properties, locale and time zone are hooked inside the target app process. */
     private fun offerTargetScope(
         context: Context,
         profile: Profile,
         packageName: String,
         afterwards: () -> Unit,
     ) {
-        if (!profile.simEnabled && !profile.localeEnabled) {
+        if (!profile.simEnabled && !profile.localeEnabled && !profile.timeZoneEnabled) {
             afterwards()
             return
         }

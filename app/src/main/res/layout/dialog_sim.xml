@@ -47,6 +47,19 @@
         android:minHeight="56dp" />
 
     <com.google.android.material.switchmaterial.SwitchMaterial
+        android:id="@+id/switch_timezone_enabled"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:background="@drawable/switch_panel_background"
+        android:minHeight="64dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:textColor="@color/app_on_surface"
+        android:textSize="15sp"
+        tools:text="同时把系统时区报成台北时间" />
+
+    <com.google.android.material.switchmaterial.SwitchMaterial
         android:id="@+id/switch_locale_enabled"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

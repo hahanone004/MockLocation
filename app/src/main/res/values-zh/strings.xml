@@ -62,6 +62,7 @@
     <string name="switch_enable_cell">本配置伪装基站</string>
     <string name="switch_enable_wifi">本配置伪装 WiFi</string>
     <string name="switch_enable_sim">本配置伪装 SIM 卡信息</string>
+    <string name="switch_enable_timezone">同时把系统时区报成 %s</string>
     <string name="switch_enable_locale">同时把系统语言报成 %s</string>
     <string name="sim_config_invalid">启用 SIM 伪装前，请选择运营商并填写有效的手机号和 ICCID。</string>
     <string name="locale_restart_required">语言设置的启用、修改或关闭需要强行停止并重新启动目标应用后才能完整生效。</string>
@@ -81,9 +82,10 @@
     <string name="profile_location_summary">%1$s, %2$s · 抖动 %3$s 米</string>
     <string name="profile_cell_summary">%1$s%2$s · ECI %3$d</string>
     <string name="profile_wifi_summary">%d 个接入点</string>
-    <string name="profile_sim_summary">%1$s · %2$s</string>
+    <string name="profile_sim_summary">%1$s · %2$s · %3$s</string>
     <string name="profile_not_configured">尚未配置</string>
     <string name="profile_all_off">所有伪装均已关闭</string>
+    <string name="profile_timezone_unchanged">系统时区不变</string>
     <string name="profile_language_unchanged">系统语言不变</string>
     <string name="action_close">关闭</string>
     <string name="profile_action_default">设为默认</string>

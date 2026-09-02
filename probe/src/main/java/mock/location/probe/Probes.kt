@@ -18,7 +18,9 @@ import android.telephony.CellIdentityWcdma
 import android.telephony.CellInfo
 import android.telephony.TelephonyManager
 import androidx.annotation.StringRes
+import java.time.ZoneId
 import java.util.Locale
+import java.util.TimeZone
 
 /** The features a reading belongs to, which is how the report is grouped. */
 enum class Group(@StringRes val title: Int) {
@@ -27,6 +29,7 @@ enum class Group(@StringRes val title: Int) {
     CELL(R.string.group_cell),
     WIFI(R.string.group_wifi),
     SIM(R.string.group_sim),
+    TIMEZONE(R.string.group_timezone),
 }
 
 /**
@@ -122,11 +125,21 @@ object Probes {
             it.getSystemService(LocaleManager::class.java)
                 ?.applicationLocales?.toLanguageTags()?.ifEmpty { "(none)" }
         }
-        probe("Settings.System/system_locales", Group.LOCALE, covered = false) {
+        probe("Settings.System/system_locales", Group.LOCALE) {
             Settings.System.getString(it.contentResolver, "system_locales")
         }
-        probe("SystemProperties/persist.sys.locale", Group.LOCALE, covered = false) {
+        probe("SystemProperties/persist.sys.locale", Group.LOCALE) {
             systemProperty("persist.sys.locale")
+        }
+
+        // ---- the clock ---------------------------------------------------
+        // No permission at all stands between an app and these, which is what
+        // made an unspoofed zone beside a spoofed SIM the cheapest
+        // contradiction on the device to find.
+        probe("TimeZone.getDefault()", Group.TIMEZONE) { TimeZone.getDefault().getID() }
+        probe("ZoneId.systemDefault()", Group.TIMEZONE) { ZoneId.systemDefault().id }
+        probe("SystemProperties/persist.sys.timezone", Group.TIMEZONE) {
+            systemProperty("persist.sys.timezone")
         }
 
         // ---- position --------------------------------------------------

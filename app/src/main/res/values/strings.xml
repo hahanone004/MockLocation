@@ -71,6 +71,7 @@
     <string name="switch_enable_cell">Spoof cell tower for this profile</string>
     <string name="switch_enable_wifi">Spoof Wi-Fi for this profile</string>
     <string name="switch_enable_sim">Spoof the SIM identity for this profile</string>
+    <string name="switch_enable_timezone">Report the system time zone as %s</string>
     <string name="switch_enable_locale">Report the system language as %s</string>
     <string name="sim_config_invalid">Choose a carrier and enter a valid phone number and ICCID before enabling SIM spoofing.</string>
     <string name="locale_restart_required">Force stop and restart the target app for the language change to take effect or be removed.</string>
@@ -90,9 +91,10 @@
     <string name="profile_location_summary">%1$s, %2$s · jitter %3$s m</string>
     <string name="profile_cell_summary">%1$s%2$s · ECI %3$d</string>
     <string name="profile_wifi_summary">%d access point(s)</string>
-    <string name="profile_sim_summary">%1$s · %2$s</string>
+    <string name="profile_sim_summary">%1$s · %2$s · %3$s</string>
     <string name="profile_not_configured">Not configured yet</string>
     <string name="profile_all_off">All spoof types are off</string>
+    <string name="profile_timezone_unchanged">time zone unchanged</string>
     <string name="profile_language_unchanged">system language unchanged</string>
     <string name="action_close">Close</string>
     <string name="profile_action_default">Use as default</string>

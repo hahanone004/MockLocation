@@ -19,6 +19,8 @@
     <string name="group_wifi">Access points</string>
     <string name="group_sim">SIM identity</string>
 
+    <string name="group_timezone">Time zone</string>
+
     <string name="scenario_cold">cold start</string>
     <string name="scenario_foreground">foreground</string>
     <string name="scenario_worker">worker thread</string>

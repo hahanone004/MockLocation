@@ -600,7 +600,7 @@ class ConfigGateway private constructor() {
         val decision = profile?.let {
             "${it.name.ifBlank { it.id }} (location=${it.locationEnabled}" +
                 " cell=${it.cellEnabled} wifi=${it.wifiEnabled} sim=${it.simEnabled}" +
-                " language=${it.localeEnabled})"
+                " language=${it.localeEnabled} timezone=${it.timeZoneEnabled})"
         } ?: "no profile"
 
         if (announced.put(packageName, decision) != decision) {
@@ -756,6 +756,11 @@ class ConfigGateway private constructor() {
     @ExperimentalStdlibApi
     fun localeSpoofFor(packageName: String): Profile? =
         simSpoofFor(packageName)?.takeIf { it.localeEnabled && it.localeTag.isNotBlank() }
+
+    /** The time zone follows the SIM's country for the same reason the language does. */
+    @ExperimentalStdlibApi
+    fun timeZoneSpoofFor(packageName: String): Profile? =
+        simSpoofFor(packageName)?.takeIf { it.timeZoneEnabled && it.timeZoneId.isNotBlank() }
 
     @ExperimentalStdlibApi
     fun readPackageList(): List<String>? {

@@ -19,6 +19,8 @@
     <string name="group_wifi">Wi-Fi</string>
     <string name="group_sim">SIM 身份</string>
 
+    <string name="group_timezone">时区</string>
+
     <string name="scenario_cold">冷启动</string>
     <string name="scenario_foreground">前台</string>
     <string name="scenario_worker">子线程</string>

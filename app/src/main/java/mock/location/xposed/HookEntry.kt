@@ -20,6 +20,7 @@ import mock.location.xposed.location.LocationHooker
 import mock.location.xposed.location.WLANHooker
 import mock.location.xposed.location.gnss.GnssHooker
 import mock.location.xposed.system.LocaleHooker
+import mock.location.xposed.system.SystemSourcesHooker
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
@@ -126,6 +127,9 @@ class HookEntry : IXposedHookZygoteInit, IXposedHookLoadPackage {
                 }
                 step("system language") {
                     LocaleHooker().hookLocale(lpparam)
+                }
+                step("system sources") {
+                    SystemSourcesHooker().hookSystemSources(lpparam)
                 }
             }
         }

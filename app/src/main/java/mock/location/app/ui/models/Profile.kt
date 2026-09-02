@@ -80,6 +80,20 @@ data class Profile(
     val localeEnabled: Boolean = false,
     /** BCP-47 tag, derived from the country. */
     val localeTag: String = "",
+
+    /**
+     * Whether the app should also see the country's time zone.
+     *
+     * Separate from [localeEnabled] because the two are noticed in different
+     * places: the language is what the app renders in, the zone is what its
+     * timestamps say. An app that wants to know whether it is being lied to
+     * asks for the zone, though, and that question needs no permission at all -
+     * which makes an unspoofed zone beside a spoofed SIM, cell and position the
+     * cheapest contradiction on the device to find.
+     */
+    val timeZoneEnabled: Boolean = false,
+    /** Olson id, derived from the country. */
+    val timeZoneId: String = "",
 ) {
     /**
      * A position drawn uniformly from the disc of radius [offset] around the

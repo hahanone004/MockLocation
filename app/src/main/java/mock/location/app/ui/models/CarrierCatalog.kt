@@ -47,6 +47,17 @@ object CarrierCatalog {
         val locale: String,
         /** How that language reads in a picker. */
         val localeLabel: String,
+        /**
+         * The zone a phone in this country would be set to.
+         *
+         * It belongs here for the same reason the language does: it is
+         * decided by where the SIM says the phone is, and a profile that
+         * claims a Taiwanese SIM while the clock runs on another country's
+         * offset contradicts itself in a way that costs nothing to check.
+         */
+        val timeZone: String,
+        /** How that zone reads in a picker. */
+        val timeZoneLabel: String,
         val label: String,
         val carriers: List<Carrier>,
     )
@@ -61,6 +72,8 @@ object CarrierCatalog {
         numberLength = 10,
         locale = "zh-TW",
         localeLabel = "繁體中文 (zh-TW)",
+        timeZone = "Asia/Taipei",
+        timeZoneLabel = "台北時間 (UTC+8)",
         label = "台灣 Taiwan",
         carriers = listOf(
             Carrier(

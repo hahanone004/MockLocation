@@ -52,18 +52,42 @@ list inside it still carry the real access network, so an app that looks there c
 still tell. The network type follows the cell switch rather than having one of its
 own - a profile with no cell filled in has nothing to be consistent with.
 
+## 系统设置与属性 / Settings and properties
+
+除了框架给应用的答案，设备还会在几处**记录**自己是什么样子，任何应用都读得到。语言伪装
+打开时，`Settings` 的 `system_locales` 和 `persist.sys.locale` 会一并报成 Profile 的语言；
+时区伪装打开时，`TimeZone.getDefault()`（以及 `ZoneId.systemDefault()`、`Calendar`、
+`SimpleDateFormat` 这些走同一条路的）和 `persist.sys.timezone` 会报成 Profile 国家的时区。
+两者都跟随 SIM 伪装，理由和语言一样：声称一张台湾 SIM 却跑在另一个国家的时区上，是零权限
+就能戳穿的自相矛盾。
+
+**已知缺口**：应用可以自己起一个 `getprop` 子进程把属性读回来，绕过这里所有的 hook。拦截
+进程创建的代价远大于收益，所以这条明确不覆盖。
+
+Beyond the answers the framework gives an app, a device also *records* what it is in a few
+places that any app can read. With the language spoof on, the `system_locales` setting and
+`persist.sys.locale` report the profile's language too; with the time zone spoof on,
+`TimeZone.getDefault()` - and `ZoneId.systemDefault()`, `Calendar` and `SimpleDateFormat`
+with it - and `persist.sys.timezone` report the profile country's zone. Both follow the SIM
+spoof for the same reason the language does: claiming a Taiwanese SIM while the clock runs on
+another country's offset is a contradiction that costs no permission at all to find.
+
+**A known gap**: an app can run a `getprop` subprocess and read the property back around
+every hook here. Intercepting process creation is a far larger surface than that check is
+worth, so it is deliberately not covered.
+
 ## 作用域 / Scope
 
 - **System Framework**：位置、基站、Wi‑Fi、GNSS、地理围栏和配置通道。
 - **电话服务 (`com.android.phone`)**：号码、ICCID、IMEI/MEID、小区信息和网络制式。
   已包含在模块默认作用域里，不必手动勾选。
-- **目标应用**：SIM 身份和系统语言。需要单独勾选目标应用。
+- **目标应用**：SIM 身份、系统语言和时区。需要单独勾选目标应用。
 - **Google Play 服务**：应用通过 Play 服务间接获取位置时，通常需要加入对应 Profile。
 
 - **System Framework**: location, cellular, Wi‑Fi, GNSS, geofencing, and the configuration channel.
 - **Phone process (`com.android.phone`)**: number, ICCID, IMEI/MEID, cell info and network
   type. Already in the module's declared scope; nothing to tick by hand.
-- **Target app**: SIM identity and system language; the target app must be scoped separately.
+- **Target app**: SIM identity, system language and time zone; the target app must be scoped separately.
 - **Google Play services**: usually needs the same profile when an app obtains location through Play services.
 
 ## 测试探针 / Probe
