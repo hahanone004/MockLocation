@@ -720,6 +720,18 @@ class ConfigGateway private constructor() {
         return installed
     }
 
+    /**
+     * Whether the framework side actually answered the last query for
+     * [packageName], as opposed to the query not having been possible to make.
+     *
+     * [profileFor] answers null for both, and a caller that treats the two
+     * alike drops its spoof every time the config channel hiccups. This lets
+     * one tell them apart: false says "ask again in a moment, and hold what you
+     * had until then", never "this app has nothing configured".
+     */
+    fun profileResolved(packageName: String): Boolean =
+        cachedProfiles[packageName.substringBefore(':')]?.answered == true
+
     @ExperimentalStdlibApi
     fun locationSpoofFor(packageName: String): Profile? =
         profileFor(packageName)?.takeIf { it.locationEnabled }

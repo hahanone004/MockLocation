@@ -4,7 +4,10 @@ import android.annotation.SuppressLint
 import android.app.LocaleManager
 import android.content.Context
 import android.content.res.Configuration
+import android.content.res.Resources
 import android.os.LocaleList
+import android.os.SystemClock
+import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.callbacks.XC_LoadPackage
 import mock.location.xposed.helpers.ConfigGateway
 import mock.location.xposed.helpers.reflect.Log
@@ -55,6 +58,10 @@ class LocaleHooker {
     @Volatile
     private var lastKnownAppLocales: LocaleList? = null
 
+    /** The last language this process reported, for the same reason. */
+    @Volatile
+    private var lastSpoofedLocale: Locale? = null
+
     /**
      * Guards the lookup against itself. It crosses a binder, and what comes
      * back can drive another configuration change on this same thread.
@@ -82,11 +89,24 @@ class LocaleHooker {
      * ResourcesManager.applyConfigurationToResources ->
      * ResourcesImpl.updateConfiguration and need not pass through it at all.
      *
-     * The three are tried in order and the first that matches wins, each being
-     * further from the system and closer to the resources than the last. All
-     * are hidden and their signatures move between releases, so failing to
-     * match is a warning and not an exception: the install at attach still
-     * stands, and the language is right until the first configuration change.
+     * Every entry that matches is held, rather than the first of them. They are
+     * not the same path tried at descending depth: the process-wide change
+     * lands at ConfigurationController.handleConfigurationChanged, while an
+     * activity's own - a rotation, a resize, entering split screen, a move to
+     * another display, a recreate - runs
+     * handleActivityConfigurationChanged -> updateResourcesForActivity and
+     * never passes through it. Stopping at the first match therefore left the
+     * whole activity path uncovered, and every rotation handed the activity's
+     * resources, and its onConfigurationChanged, the device's real language.
+     *
+     * Every Configuration in the argument list is rewritten, not just the
+     * first: on the activity path the one that decides the language is an
+     * override configuration sitting behind other arguments.
+     *
+     * All of these are hidden and their signatures move between releases, so
+     * failing to match is a warning and not an exception: the install at attach
+     * still stands, and the language is right until the first configuration
+     * change.
      */
     @ExperimentalStdlibApi
     private fun hookSystemConfiguration(
@@ -96,9 +116,12 @@ class LocaleHooker {
         val entries = listOf(
             "android.app.ConfigurationController" to "handleConfigurationChanged",
             "android.app.ActivityThread" to "handleConfigurationChanged",
+            "android.app.ActivityThread" to "handleActivityConfigurationChanged",
             "android.app.ResourcesManager" to "applyConfigurationToResources",
+            "android.app.ResourcesManager" to "updateResourcesForActivity",
         )
 
+        var held = 0
         entries.forEach { (className, methodName) ->
             val clazz = try {
                 lpparam.classLoader.loadClass(className)
@@ -108,28 +131,39 @@ class LocaleHooker {
             }
 
             val methods = findAllMethods(clazz, findSuper = true) {
-                name == methodName && parameterCount >= 1 &&
-                    parameterTypes[0] == Configuration::class.java
+                name == methodName &&
+                    parameterTypes.any { it == Configuration::class.java }
             }
             if (methods.isEmpty()) return@forEach
 
-            methods.hookBefore { param ->
-                val incoming = param.args.getOrNull(0) as? Configuration ?: return@hookBefore
-                val effective = effectiveLocales(packageName) ?: return@hookBefore
-                if (effective == incoming.locales) return@hookBefore
+            methods.hookBefore { param -> holdLocales(param, packageName) }
 
-                // A copy rather than an edit in place: the same Configuration
-                // is handed to several Resources objects, and one of them is
-                // the system's.
-                param.args[0] = Configuration(incoming).apply { setLocales(effective) }
-            }
-
+            held++
             Log.d { "system configuration held at $className.$methodName" }
-            return
         }
 
-        Log.w("no system configuration entry point in $packageName; " +
-            "the language is installed at attach only")
+        if (held == 0) {
+            Log.w("no system configuration entry point in $packageName; " +
+                "the language is installed at attach only")
+        }
+    }
+
+    /**
+     * Puts this process' language into every Configuration the call carries.
+     *
+     * A copy rather than an edit in place: the same Configuration is handed to
+     * several Resources objects, and one of them is the system's.
+     */
+    @ExperimentalStdlibApi
+    private fun holdLocales(param: XC_MethodHook.MethodHookParam, packageName: String) {
+        val effective = effectiveLocales(packageName) ?: return
+
+        param.args.forEachIndexed { index, argument ->
+            val incoming = argument as? Configuration ?: return@forEachIndexed
+            if (effective == incoming.locales) return@forEachIndexed
+
+            param.args[index] = Configuration(incoming).apply { setLocales(effective) }
+        }
     }
 
     /**
@@ -200,13 +234,25 @@ class LocaleHooker {
         if (attachMethods.isEmpty()) {
             throw NoSuchMethodException("Application.attach(Context)")
         }
+        val lock = Any()
         attachMethods.hookBefore { param ->
             val context = param.args[0] as? Context ?: return@hookBefore
-            if (!installed.compareAndSet(false, true)) return@hookBefore
 
-            ConfigGateway.get().setCustomContext(context)
-            appContext = context
-            installLocale(packageName, context, localeListClass)
+            synchronized(lock) {
+                if (installed.get()) return@hookBefore
+
+                ConfigGateway.get().setCustomContext(context)
+                appContext = context
+                // Only once the answer is in. Setting it first retired the
+                // attempt on the one outcome worth repeating - the config
+                // channel not answering yet - and left the process on the
+                // device's real language until some later configuration
+                // change, or for good in an app that reads the language in
+                // attachBaseContext and keeps it.
+                if (installLocale(packageName, context, localeListClass)) {
+                    installed.set(true)
+                }
+            }
         }
     }
 
@@ -217,6 +263,10 @@ class LocaleHooker {
      * after bind - so this replaces it rather than racing it, and does the same
      * for the app's resources so an app with no language of its own really does
      * render in the profile's.
+     *
+     * Returns whether the question is settled: either a language was installed,
+     * or the framework said outright that this app has none to install. False
+     * means only that nobody could be asked, and that it is worth asking again.
      */
     @ExperimentalStdlibApi
     @Suppress("DEPRECATION")
@@ -224,10 +274,11 @@ class LocaleHooker {
         packageName: String,
         context: Context,
         localeListClass: Class<*>,
-    ) {
-        val effective = effectiveLocales(packageName) ?: return
+    ): Boolean {
+        val effective = awaitLocales(packageName)
+            ?: return ConfigGateway.get().profileResolved(packageName)
 
-        try {
+        return try {
             // The one-argument overload makes the first entry the default,
             // which is the app's own language when it has one.
             findMethod(localeListClass) {
@@ -240,10 +291,55 @@ class LocaleHooker {
             }
             resources.updateConfiguration(configuration, resources.displayMetrics)
 
+            // The app's Resources are not the only ones in the process.
+            // Resources.getSystem() carries a configuration of its own, which
+            // nothing here had touched, so an app reading its locales before
+            // the first configuration change - the one that repairs it in
+            // passing - read the device's real language straight off it.
+            val system = Resources.getSystem()
+            val systemConfiguration = Configuration(system.configuration).apply {
+                setLocales(effective)
+            }
+            system.updateConfiguration(systemConfiguration, system.displayMetrics)
+
             Log.i("locales for $packageName reported as ${effective.toLanguageTags()}")
+            true
         } catch (t: Throwable) {
             Log.e("could not install the default locale for $packageName", t)
+            false
         }
+    }
+
+    /**
+     * The locales to install, waiting briefly for the config channel if it is
+     * not answering yet.
+     *
+     * Null once the framework has said this app has no language spoof, and
+     * after the last attempt when it never said anything at all.
+     *
+     * This blocks Application.attach, so it is bounded and it only ever runs at
+     * all when a query goes unanswered - the ordinary case returns on the first
+     * pass. Paying it is the point: attach is the last moment before the app's
+     * own attachBaseContext reads the language, and an app that caches it there
+     * never asks a second time. The wait is a little longer than the gateway
+     * holds an unresolved answer for, so each pass is a fresh query rather than
+     * the same cached failure read three times.
+     */
+    @ExperimentalStdlibApi
+    private fun awaitLocales(packageName: String): LocaleList? {
+        repeat(INSTALL_ATTEMPTS) { attempt ->
+            effectiveLocales(packageName)?.let { return it }
+            if (ConfigGateway.get().profileResolved(packageName)) return null
+
+            if (attempt < INSTALL_ATTEMPTS - 1) {
+                Log.d { "no profile answer for $packageName yet; asking again" }
+                SystemClock.sleep(INSTALL_RETRY_MILLIS)
+            }
+        }
+
+        Log.w("no profile answer for $packageName at attach; " +
+            "the language follows the first configuration change")
+        return null
     }
 
     /**
@@ -298,15 +394,36 @@ class LocaleHooker {
         }
     }
 
+    /**
+     * The profile's language, or null to leave the caller alone.
+     *
+     * A profile lookup answers null both for "this app has no language spoof"
+     * and for "the config channel could not be reached", and the two were
+     * treated alike. That is what let a single unanswered query in the middle
+     * of a session pass the device's real configuration through to the app -
+     * and the system sets the process default from that same configuration, so
+     * one miss switched the whole process' language over. An unanswered query
+     * now holds the last language this process reported instead; only a
+     * definite answer from the framework drops the spoof.
+     */
     @ExperimentalStdlibApi
     private fun spoofedLocale(packageName: String): Locale? {
-        val profile = ConfigGateway.get().localeSpoofFor(packageName) ?: return null
+        val gateway = ConfigGateway.get()
+        val profile = gateway.localeSpoofFor(packageName)
+            ?: return if (gateway.profileResolved(packageName)) null else lastSpoofedLocale
 
         val locale = Locale.forLanguageTag(profile.localeTag)
         // forLanguageTag answers the root locale for anything it cannot parse,
         // and reporting "" as the language is a tell in itself.
         if (locale.language.isEmpty()) return null
 
+        lastSpoofedLocale = locale
         return locale
+    }
+
+    private companion object {
+        /** Passes over the config channel at attach, and the gap between them. */
+        const val INSTALL_ATTEMPTS = 3
+        const val INSTALL_RETRY_MILLIS = 300L
     }
 }
