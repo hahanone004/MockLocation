@@ -27,6 +27,17 @@ enum class Group(@StringRes val title: Int) {
 }
 
 /**
+ * How two readings of the same probe are told apart.
+ *
+ * Most answers are exact strings and any difference is a difference. A
+ * position is not: a profile with a jitter radius moves the fix continuously
+ * inside a disc around the configured point, so two scenarios reading the same
+ * spoof will never agree to six decimal places and never should. What they do
+ * is stay in the same place, which is what [COORDINATE] compares.
+ */
+enum class Comparison { EXACT, COORDINATE }
+
+/**
  * One question put to the system.
  *
  * [read] answers the value as a string, or null when there is nothing to
@@ -47,6 +58,7 @@ class Probe(
     val id: String,
     val group: Group,
     val covered: Boolean,
+    val comparison: Comparison,
     val read: (Context) -> String?,
 )
 
@@ -101,12 +113,19 @@ object Probes {
             LocationManager.PASSIVE_PROVIDER,
             LocationManager.FUSED_PROVIDER,
         )) {
-            probe("getLastKnownLocation($provider)", Group.LOCATION) { context ->
+            probe(
+                "getLastKnownLocation($provider)",
+                Group.LOCATION,
+                comparison = Comparison.COORDINATE,
+            ) { context ->
                 val manager = context.getSystemService(LocationManager::class.java)
                     ?: return@probe null
-                // The position only. Accuracy, bearing and the fix time move on
-                // their own even when the coordinates are pinned, and every
-                // scenario would then disagree with every other one.
+                // The position only. Accuracy, bearing and the fix time move
+                // on their own even when the coordinates are pinned, and every
+                // scenario would then disagree with every other one. The
+                // coordinates move too when the profile has a jitter radius,
+                // which is why they are compared by distance rather than as
+                // text - see Comparison.COORDINATE.
                 manager.getLastKnownLocation(provider)?.let { fix ->
                     "%.6f, %.6f".format(Locale.ROOT, fix.latitude, fix.longitude)
                 }
@@ -197,8 +216,9 @@ object Probes {
         id: String,
         group: Group,
         covered: Boolean = true,
+        comparison: Comparison = Comparison.EXACT,
         read: (Context) -> String?,
-    ) = add(Probe(id, group, covered, read))
+    ) = add(Probe(id, group, covered, comparison, read))
 
     private fun MutableList<Probe>.telephony(id: String, read: (TelephonyManager) -> String?) =
         probe(id, Group.SIM) { context ->

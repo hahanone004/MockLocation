@@ -78,8 +78,13 @@ own - a profile with no cell filled in has nothing to be consistent with.
 分组，可一键复制。标着「模块未覆盖此 API」的项目是模块本来就没接管的入口，列在那里是为了
 知道它们还在说真话，不是缺陷。
 
-一致性检查查不出「功能整个没生效」——没伪装的读数同样是稳定的。反过来，真实的位置、扫描
-结果和小区本来就会随时间变化，所以未分配 Profile 时看到位置/Wi‑Fi/基站漂移是正常的。
+位置是按距离比较的，不是按字符串：Profile 的抖动半径（`offset`）本来就让每次读到的经纬度
+都不同，逐字比对会把正常工作的伪装判成漂移。探针把彼此相距 1 km 以内的定位归为同一处，并
+把每一处的实际范围一并打印出来——所以抖动半径接近这个量级时，报告会自己说清楚，而不是躲
+在结论后面。
+
+一致性检查查不出「功能整个没生效」——没伪装的读数同样是稳定的。反过来，真实的扫描结果和
+小区本来就会随时间变化，所以未分配 Profile 时看到 Wi‑Fi/基站漂移是正常的。
 
 APK 不随版本发布，每次 CI 构建作为 `probe-debug` 制品产出。
 
@@ -95,9 +100,15 @@ reopen it (the cold reading is taken before the permission dialog can be answere
 press Run. Rows marked "not hooked by the module" are entry points the module never claimed;
 they are listed so it is visible that they still tell the truth.
 
+Positions are compared by distance rather than as text. A profile with a jitter radius hands
+out a different fix every time by design, so comparing the digits would call a working spoof
+a defect. Fixes within 1 km of each other count as one place, and the measured spread of each
+place is printed beside it, so a jitter radius anywhere near that scale is visible in the
+report instead of hidden behind the verdict.
+
 Agreement cannot see a feature that is switched off entirely - an unspoofed reading is just
-as stable. And a real position, scan result or serving cell moves on its own, so drift in
-those with no profile assigned is the expected answer rather than a defect.
+as stable. And a real scan result or serving cell moves on its own, so drift in those with no
+profile assigned is the expected answer rather than a defect.
 
 The APK is not published with releases; every CI build uploads it as the `probe-debug`
 artifact.

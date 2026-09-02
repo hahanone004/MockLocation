@@ -87,11 +87,13 @@ class FindingAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
             binding.verdict.setTextColor(ContextCompat.getColor(context, verdict.second))
 
             val detail = StringBuilder()
-            finding.values.forEach { (value, scenarios) ->
+            finding.clusters.forEach { cluster ->
                 if (detail.isNotEmpty()) detail.append('\n')
-                detail.append(Report.scenarioList(context, scenarios))
-                    .append(": ")
-                    .append(value)
+                detail.append(Report.describe(context, cluster))
+            }
+            finding.separationMetres?.let { metres ->
+                if (detail.isNotEmpty()) detail.append('\n')
+                detail.append(context.getString(R.string.cluster_separation, metres))
             }
             finding.silent.entries.groupBy({ it.value }, { it.key })
                 .forEach { (reason, scenarios) ->

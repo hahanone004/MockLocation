@@ -34,6 +34,9 @@
     <string name="verdict_thin">one reading</string>
     <string name="verdict_no_data">no data</string>
 
+    <string name="cluster_spread">(within %1$d m)</string>
+    <string name="cluster_separation">the places are %1$d m apart</string>
+
     <string name="not_covered">not hooked by the module</string>
     <string name="reading_none">nothing to report</string>
     <string name="reading_denied">permission refused</string>

@@ -34,6 +34,9 @@
     <string name="verdict_thin">仅一次读数</string>
     <string name="verdict_no_data">无数据</string>
 
+    <string name="cluster_spread">（范围 %1$d m 内）</string>
+    <string name="cluster_separation">两处相距约 %1$d m</string>
+
     <string name="not_covered">模块未覆盖此 API</string>
     <string name="reading_none">没有可读的值</string>
     <string name="reading_denied">权限被拒绝</string>
