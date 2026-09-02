@@ -74,7 +74,8 @@ own - a profile with no cell filled in has nothing to be consistent with.
 进程重启之后各读一次，只要某一项在场景之间变了，就说明它来自伪装没有覆盖到的地方。
 
 用法：安装 probe，在 MockLocation 里把它分配到一个 Profile 并加入模块作用域，授予权限后
-重新打开（冷启动读数在权限对话框之前采集），点「开始测试」。报告按语言/位置/基站/Wi‑Fi/SIM
+重新打开（冷启动读数在权限对话框之前采集，首次安装那一遍的冷启动会标成「权限尚未授予」），
+点「开始测试」。报告按语言/位置/基站/Wi‑Fi/SIM
 分组，可一键复制。标着「模块未覆盖此 API」的项目是模块本来就没接管的入口，列在那里是为了
 知道它们还在说真话，不是缺陷。
 
@@ -96,8 +97,9 @@ a second process, and in the fresh process left behind by a deliberate kill. A r
 changes between any two of those came from somewhere the spoof does not cover.
 
 Install it, assign it a profile, add it to the module scope, grant the permissions and
-reopen it (the cold reading is taken before the permission dialog can be answered), then
-press Run. Rows marked "not hooked by the module" are entry points the module never claimed;
+reopen it - the cold reading is taken before the permission dialog can be answered, so on a
+fresh install that first cold sweep records the permission rather than a value - then press
+Run. Rows marked "not hooked by the module" are entry points the module never claimed;
 they are listed so it is visible that they still tell the truth.
 
 Positions are compared by distance rather than as text. A profile with a jitter radius hands

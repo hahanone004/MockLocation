@@ -1,8 +1,10 @@
 package mock.location.probe
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.app.LocaleManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.content.res.Resources
 import android.location.LocationManager
 import android.net.wifi.WifiManager
@@ -59,6 +61,20 @@ class Probe(
     val group: Group,
     val covered: Boolean,
     val comparison: Comparison,
+    /**
+     * What has to be granted before [read] means anything.
+     *
+     * Checked before the call rather than left to throw, because the
+     * interesting APIs do not throw. getScanResults answers with an empty list
+     * when location is not granted and getBSSID with 02:00:00:00:00:00, and
+     * both of those are perfectly good values that happen to be about the
+     * permission rather than about the device. Compared against a scenario that
+     * did hold the permission, they read as a spoof coming apart - which is how
+     * the cold sweep of a fresh install, taken before the permission dialog can
+     * possibly have been answered, produced a drifted Wi-Fi reading on a device
+     * with no profile assigned at all.
+     */
+    val permissions: List<String>,
     val read: (Context) -> String?,
 )
 
@@ -71,6 +87,12 @@ object Probes {
      * Application.onCreate - and a probe that blocked there would change the
      * very timing the cold scenario exists to measure.
      */
+    /** Coarse location is not enough: it answers with a deliberately fuzzed fix. */
+    private val LOCATION = listOf(Manifest.permission.ACCESS_FINE_LOCATION)
+    private val PHONE = listOf(Manifest.permission.READ_PHONE_STATE)
+    private val CELL = LOCATION + PHONE
+    private val NEARBY = LOCATION + Manifest.permission.NEARBY_WIFI_DEVICES
+
     @SuppressLint("HardwareIds", "MissingPermission")
     val all: List<Probe> = buildList {
         // ---- language --------------------------------------------------
@@ -117,6 +139,7 @@ object Probes {
                 "getLastKnownLocation($provider)",
                 Group.LOCATION,
                 comparison = Comparison.COORDINATE,
+                permissions = LOCATION,
             ) { context ->
                 val manager = context.getSystemService(LocationManager::class.java)
                     ?: return@probe null
@@ -133,7 +156,7 @@ object Probes {
         }
 
         // ---- serving cell ----------------------------------------------
-        probe("getAllCellInfo()", Group.CELL) { context ->
+        probe("getAllCellInfo()", Group.CELL, permissions = CELL) { context ->
             val telephony = context.getSystemService(TelephonyManager::class.java)
                 ?: return@probe null
             telephony.allCellInfo
@@ -142,7 +165,7 @@ object Probes {
                 ?.joinToString("\n")
                 ?.ifEmpty { "(empty)" }
         }
-        probe("getDataNetworkType()", Group.CELL) { context ->
+        probe("getDataNetworkType()", Group.CELL, permissions = PHONE) { context ->
             networkTypeName(
                 context.getSystemService(TelephonyManager::class.java)?.dataNetworkType
             )
@@ -153,14 +176,19 @@ object Probes {
         probe("getNetworkOperatorName()", Group.CELL) { context ->
             context.getSystemService(TelephonyManager::class.java)?.networkOperatorName
         }
-        probe("getServiceState()", Group.CELL, covered = false) { context ->
+        probe(
+            "getServiceState()",
+            Group.CELL,
+            covered = false,
+            permissions = CELL,
+        ) { context ->
             context.getSystemService(TelephonyManager::class.java)
                 ?.serviceState
                 ?.let { state -> "state=${state.state} operator=${state.operatorNumeric}" }
         }
 
         // ---- access points ---------------------------------------------
-        probe("WifiManager.getScanResults()", Group.WIFI) { context ->
+        probe("WifiManager.getScanResults()", Group.WIFI, permissions = NEARBY) { context ->
             val wifi = context.getSystemService(WifiManager::class.java) ?: return@probe null
             @Suppress("DEPRECATION")
             wifi.scanResults
@@ -169,11 +197,11 @@ object Probes {
                 .joinToString("\n")
                 .ifEmpty { "(empty)" }
         }
-        probe("getConnectionInfo().getBSSID()", Group.WIFI) { context ->
+        probe("getConnectionInfo().getBSSID()", Group.WIFI, permissions = NEARBY) { context ->
             @Suppress("DEPRECATION")
             context.getSystemService(WifiManager::class.java)?.connectionInfo?.getBSSID()
         }
-        probe("getConnectionInfo().getSSID()", Group.WIFI) { context ->
+        probe("getConnectionInfo().getSSID()", Group.WIFI, permissions = NEARBY) { context ->
             @Suppress("DEPRECATION")
             context.getSystemService(WifiManager::class.java)?.connectionInfo?.getSSID()
         }
@@ -183,10 +211,13 @@ object Probes {
         telephony("getSimOperatorName()") { it.simOperatorName }
         telephony("getSimCountryIso()") { it.simCountryIso }
         telephony("getNetworkCountryIso()") { it.networkCountryIso }
-        telephony("getSimSerialNumber()") { it.simSerialNumber }
-        telephony("getSubscriberId()") { it.subscriberId }
-        telephony("getImei()") { it.imei }
-        telephony("getLine1Number()") { it.line1Number }
+        telephony("getSimSerialNumber()", PHONE) { it.simSerialNumber }
+        telephony("getSubscriberId()", PHONE) { it.subscriberId }
+        telephony("getImei()", PHONE) { it.imei }
+        telephony(
+            "getLine1Number()",
+            PHONE + Manifest.permission.READ_PHONE_NUMBERS,
+        ) { it.line1Number }
     }
 
     private val byId: Map<String, Probe> = all.associateBy { it.id }
@@ -198,10 +229,19 @@ object Probes {
      *
      * A probe that throws is recorded rather than allowed to end the sweep: an
      * app is refused READ_PHONE_STATE by default, and half the SIM probes
-     * therefore throw on a device where the other half say something useful.
+     * therefore throw on a device where the other half say something useful. A
+     * probe whose permissions are not held is not called at all - see
+     * [Probe.permissions] for why its answer would be worse than no answer.
      */
-    fun sweep(context: Context): Sweep = all.associate { probe ->
-        probe.id to try {
+    fun sweep(context: Context): Sweep = all.associate { probe -> probe.id to read(context, probe) }
+
+    private fun read(context: Context, probe: Probe): Reading {
+        val ungranted = probe.permissions.any {
+            context.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (ungranted) return Reading.Unavailable(context.getString(R.string.reading_not_granted))
+
+        return try {
             probe.read(context)
                 ?.let { Reading.Value(it) }
                 ?: Reading.Unavailable(context.getString(R.string.reading_none))
@@ -217,13 +257,18 @@ object Probes {
         group: Group,
         covered: Boolean = true,
         comparison: Comparison = Comparison.EXACT,
+        permissions: List<String> = emptyList(),
         read: (Context) -> String?,
-    ) = add(Probe(id, group, covered, comparison, read))
+    ) = add(Probe(id, group, covered, comparison, permissions, read))
 
-    private fun MutableList<Probe>.telephony(id: String, read: (TelephonyManager) -> String?) =
-        probe(id, Group.SIM) { context ->
-            context.getSystemService(TelephonyManager::class.java)?.let(read)
-        }
+    private fun MutableList<Probe>.telephony(
+        id: String,
+        permissions: List<String> = emptyList(),
+        read: (TelephonyManager) -> String?,
+    ) = probe(id, Group.SIM, permissions = permissions) { context ->
+        context.getSystemService(TelephonyManager::class.java)?.let(read)
+    }
+
 
     /**
      * A cell, as the identity the module substitutes rather than as the

@@ -190,17 +190,19 @@ object Report {
                 }
                 builder.append('\n')
 
-                val mark = if (finding.verdict == Finding.Verdict.DRIFTED) "  ! " else "  = "
+                // A single reading is not agreement, and printing it with the
+                // same mark as eight that agree says it is.
+                val mark = when (finding.verdict) {
+                    Finding.Verdict.DRIFTED -> "  ! "
+                    Finding.Verdict.THIN -> "  ? "
+                    else -> "  = "
+                }
                 finding.clusters.forEach { cluster ->
                     builder.append(mark).append(describe(context, cluster)).append('\n')
                 }
                 finding.separationMetres?.let {
                     builder.append("    ")
                         .append(context.getString(R.string.cluster_separation, it))
-                        .append('\n')
-                }
-                if (finding.verdict == Finding.Verdict.NO_DATA) {
-                    builder.append("  - ").append(context.getString(R.string.verdict_no_data))
                         .append('\n')
                 }
 

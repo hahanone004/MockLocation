@@ -39,6 +39,7 @@
 
     <string name="not_covered">模块未覆盖此 API</string>
     <string name="reading_none">没有可读的值</string>
+    <string name="reading_not_granted">权限尚未授予</string>
     <string name="reading_denied">权限被拒绝</string>
     <string name="reading_no_remote">第二进程没有应答</string>
 
