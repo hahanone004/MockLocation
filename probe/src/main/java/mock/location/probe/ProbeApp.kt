@@ -21,7 +21,11 @@ class ProbeApp : Application() {
         // inherited into scope.
         if (Application.getProcessName().contains(':')) return
 
+        // After the cold sweep, never before: the cold reading is meant to be
+        // what an app sees the instant it starts, and registering first would
+        // hand it values this process went and asked for.
         val cold = Probes.sweep(this)
+        Watchers.start(this)
         val saved = SweepStore.take(this)
 
         if (saved == null) {

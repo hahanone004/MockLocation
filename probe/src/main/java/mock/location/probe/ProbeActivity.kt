@@ -39,12 +39,16 @@ class ProbeActivity : AppCompatActivity() {
         binding.copy.setOnClickListener { copyReport() }
 
         requestMissingPermissions()
+        // Idempotent, and the call that matters when the permissions were
+        // granted after the application had already tried.
+        Watchers.start(this)
         render()
     }
 
     override fun onResume() {
         super.onResume()
 
+        Watchers.start(this)
         ProbeRun.observe(::render)
         ProbeRun.resume(this)
         render()

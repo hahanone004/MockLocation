@@ -6,6 +6,7 @@ import android.app.LocaleManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.content.res.Resources
+import android.location.Location
 import android.location.LocationManager
 import android.net.wifi.WifiManager
 import android.os.LocaleList
@@ -155,15 +156,43 @@ object Probes {
             }
         }
 
+        // ---- position, as the system delivers it -----------------------
+        // Everything above is a value an app went and asked for. These are the
+        // ones that arrive on their own, which is how an app that actually
+        // wants a position gets one - and a separate set of hooks in the
+        // module, none of which any probe reached before.
+        probe(
+            "LocationListener.onLocationChanged(gps)",
+            Group.LOCATION,
+            comparison = Comparison.COORDINATE,
+            permissions = LOCATION,
+        ) { position(Watchers.gpsFix) }
+
+        probe(
+            "LocationListener.onLocationChanged(network)",
+            Group.LOCATION,
+            comparison = Comparison.COORDINATE,
+            permissions = LOCATION,
+        ) { position(Watchers.networkFix) }
+
+        probe(
+            "GnssStatus.Callback.onSatelliteStatusChanged()",
+            Group.LOCATION,
+            permissions = LOCATION,
+        ) { Watchers.satellites ?: throw Pending() }
+
+        probe(
+            "OnNmeaMessageListener (GGA)",
+            Group.LOCATION,
+            comparison = Comparison.COORDINATE,
+            permissions = LOCATION,
+        ) { Watchers.nmeaPosition ?: throw Pending() }
+
         // ---- serving cell ----------------------------------------------
         probe("getAllCellInfo()", Group.CELL, permissions = CELL) { context ->
             val telephony = context.getSystemService(TelephonyManager::class.java)
                 ?: return@probe null
-            telephony.allCellInfo
-                ?.map(::describeCell)
-                ?.sorted()
-                ?.joinToString("\n")
-                ?.ifEmpty { "(empty)" }
+            telephony.allCellInfo?.let(::describeCells)
         }
         probe("getDataNetworkType()", Group.CELL, permissions = PHONE) { context ->
             networkTypeName(
@@ -176,6 +205,18 @@ object Probes {
         probe("getNetworkOperatorName()", Group.CELL) { context ->
             context.getSystemService(TelephonyManager::class.java)?.networkOperatorName
         }
+        probe(
+            "TelephonyCallback.onCellInfoChanged()",
+            Group.CELL,
+            permissions = CELL,
+        ) { describeCells(Watchers.cells ?: throw Pending()) }
+
+        probe(
+            "TelephonyCallback.onDisplayInfoChanged()",
+            Group.CELL,
+            permissions = CELL,
+        ) { Watchers.displayInfo ?: throw Pending() }
+
         probe(
             "getServiceState()",
             Group.CELL,
@@ -220,6 +261,9 @@ object Probes {
         ) { it.line1Number }
     }
 
+    /** Raised by a probe whose value is delivered rather than asked for. */
+    private class Pending : RuntimeException()
+
     private val byId: Map<String, Probe> = all.associateBy { it.id }
 
     fun byId(id: String): Probe? = byId[id]
@@ -245,6 +289,8 @@ object Probes {
             probe.read(context)
                 ?.let { Reading.Value(it) }
                 ?: Reading.Unavailable(Reason.NONE)
+        } catch (_: Pending) {
+            Reading.Unavailable(Reason.PENDING)
         } catch (_: SecurityException) {
             Reading.Unavailable(Reason.DENIED)
         } catch (t: Throwable) {
@@ -269,6 +315,16 @@ object Probes {
         context.getSystemService(TelephonyManager::class.java)?.let(read)
     }
 
+
+    /** The coordinates of a delivered fix, or pending when none has arrived. */
+    private fun position(fix: Location?): String {
+        val location = fix ?: throw Pending()
+
+        return String.format(Locale.ROOT, "%.6f, %.6f", location.latitude, location.longitude)
+    }
+
+    private fun describeCells(cells: List<CellInfo>): String =
+        cells.map(::describeCell).sorted().joinToString("\n").ifEmpty { "(empty)" }
 
     /**
      * A cell, as the identity the module substitutes rather than as the

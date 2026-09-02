@@ -52,12 +52,16 @@ object Reason {
     const val NOT_GRANTED = "not-granted"
     const val NO_REMOTE = "no-remote"
 
+    /** A value that is delivered rather than asked for, and has not been yet. */
+    const val PENDING = "pending"
+
     /** Anything else is the name of whatever the probe threw, and stands alone. */
     fun text(context: Context, reason: String): String = when (reason) {
         NONE -> context.getString(R.string.reading_none)
         DENIED -> context.getString(R.string.reading_denied)
         NOT_GRANTED -> context.getString(R.string.reading_not_granted)
         NO_REMOTE -> context.getString(R.string.reading_no_remote)
+        PENDING -> context.getString(R.string.reading_pending)
         else -> reason
     }
 }

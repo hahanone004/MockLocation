@@ -79,6 +79,12 @@ own - a profile with no cell filled in has nothing to be consistent with.
 分组，可一键复制。标着「模块未覆盖此 API」的项目是模块本来就没接管的入口，列在那里是为了
 知道它们还在说真话，不是缺陷。
 
+探针问两种问题。一种是应用主动去取的值（`getLastKnownLocation`、`getAllCellInfo`、
+`getScanResults`），另一种是系统自己送上门的（`LocationListener`、GNSS 状态与 NMEA、
+`TelephonyCallback`）。后者才是真实应用拿位置的主要方式，模块也为它单独准备了一整套
+hook，所以两种都测：监听在进程启动时注册一次，每个场景读最后一次送达的值，从不等待。
+冷启动那一列会显示「回调尚未送达」——注册和它发生在同一瞬间，本来就不可能有值。
+
 位置是按距离比较的，不是按字符串：Profile 的抖动半径（`offset`）本来就让每次读到的经纬度
 都不同，逐字比对会把正常工作的伪装判成漂移。探针把彼此相距 1 km 以内的定位归为同一处，并
 把每一处的实际范围一并打印出来——所以抖动半径接近这个量级时，报告会自己说清楚，而不是躲
@@ -101,6 +107,15 @@ reopen it - the cold reading is taken before the permission dialog can be answer
 fresh install that first cold sweep records the permission rather than a value - then press
 Run. Rows marked "not hooked by the module" are entry points the module never claimed;
 they are listed so it is visible that they still tell the truth.
+
+The probe asks two kinds of question. One is a value an app goes and asks for
+(`getLastKnownLocation`, `getAllCellInfo`, `getScanResults`); the other is a value the system
+delivers on its own (`LocationListener`, GNSS status and NMEA, `TelephonyCallback`). The
+second is how an app that actually wants a position gets one, and the module hooks that
+delivery separately, so both are covered: the listeners are registered once at process start
+and each scenario reads the latest delivery without ever waiting for one. The cold column
+reads "no callback yet" - it runs in the same breath as the registration and cannot have
+received anything.
 
 Positions are compared by distance rather than as text. A profile with a jitter radius hands
 out a different fix every time by design, so comparing the digits would call a working spoof
