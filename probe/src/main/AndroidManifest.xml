@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!--
+      An ordinary app's view of the device, which is the point: the probe asks
+      only what any app may ask, so a reading it cannot take is a reading the
+      module never had to cover.
+    -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <uses-permission android:name="android.permission.READ_PHONE_NUMBERS" />
+
+    <application
+        android:name=".ProbeApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Probe">
+
+        <activity
+            android:name=".ProbeActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!--
+          A second process of the same app. A module installs its hooks once per
+          process, so a spoof that holds in the main one says nothing about
+          this one until it is asked.
+        -->
+        <service
+            android:name=".RemoteProbeService"
+            android:exported="false"
+            android:process=":remote" />
+    </application>
+</manifest>
