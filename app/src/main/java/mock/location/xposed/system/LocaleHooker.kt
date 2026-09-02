@@ -16,6 +16,7 @@ import mock.location.xposed.helpers.reflect.findField
 import mock.location.xposed.helpers.reflect.findMethod
 import mock.location.xposed.helpers.reflect.hookAfter
 import mock.location.xposed.helpers.reflect.hookBefore
+import mock.location.xposed.helpers.reflect.isStatic
 import java.lang.reflect.Modifier
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
