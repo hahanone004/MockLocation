@@ -117,7 +117,7 @@ hook，所以两种都测：监听在进程启动时注册一次，每个场景�
 一致性检查查不出「功能整个没生效」——没伪装的读数同样是稳定的。反过来，真实的扫描结果和
 小区本来就会随时间变化，所以未分配 Profile 时看到 Wi‑Fi/基站漂移是正常的。
 
-APK 不随版本发布，每次 CI 构建作为 `probe-debug` 制品产出。
+APK 随每个 Release 一起发布（`probe-release.apk`），每次 CI 构建也会产出 `probe-debug` 制品。
 
 `:probe` is a separate test app (`mock.location.probe`) that checks whether a spoof holds
 everywhere. It never reads the module's config and has no idea what the profile says: the
@@ -151,8 +151,8 @@ Agreement cannot see a feature that is switched off entirely - an unspoofed read
 as stable. And a real scan result or serving cell moves on its own, so drift in those with no
 profile assigned is the expected answer rather than a defect.
 
-The APK is not published with releases; every CI build uploads it as the `probe-debug`
-artifact.
+The APK is published with every release as `probe-release.apk`, and every CI build also
+uploads it as the `probe-debug` artifact.
 
 ## 注意事项 / Notes
 

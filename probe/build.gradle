@@ -23,9 +23,23 @@ android {
         viewBinding = true
     }
 
+    // The same key as the module, from the same CI secrets. A test tool has no
+    // need of a release key of its own, but it does need the same one every
+    // time: an APK signed with a debug key generated on whichever runner built
+    // it cannot be installed over the last release of itself.
+    signingConfigs {
+        release {
+            storeFile file(System.getenv("RELEASE_KEYSTORE_PATH") ?: "missing-release-keystore.jks")
+            storePassword System.getenv("RELEASE_STORE_PASSWORD") ?: "missing"
+            keyAlias System.getenv("RELEASE_KEY_ALIAS") ?: "missing"
+            keyPassword System.getenv("RELEASE_KEY_PASSWORD") ?: "missing"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
