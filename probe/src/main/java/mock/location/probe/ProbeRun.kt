@@ -260,9 +260,7 @@ object ProbeRun {
             remoteConnection = null
             record(
                 Scenario.REMOTE,
-                Probes.all.associate {
-                    it.id to Reading.Unavailable(application.getString(R.string.reading_no_remote))
-                },
+                Probes.all.associate { it.id to Reading.Unavailable(Reason.NO_REMOTE) },
             )
             advance(application)
         }

@@ -1,5 +1,7 @@
 package mock.location.probe
 
+import android.content.Context
+
 /**
  * One probe's answer, taken once in one scenario.
  *
@@ -28,6 +30,35 @@ sealed class Reading {
             encoded.startsWith("V") -> Value(encoded.drop(1))
             else -> Unavailable(encoded.drop(1))
         }
+    }
+}
+
+/**
+ * Why a reading could not be taken, held as a stable key and turned into words
+ * only when it is shown.
+ *
+ * It used to be the words themselves, resolved through whatever Context the
+ * sweep was handed - which meant the reason was written in the language of that
+ * Context. In a process whose language is being spoofed that is not one
+ * language: the application context reported the profile's, the activity's
+ * reported the device's, and the same refusal came out in two languages in one
+ * report. Nothing was compared wrongly, but a report that says two different
+ * things about one refusal is a report nobody should have to second-guess.
+ */
+object Reason {
+
+    const val NONE = "none"
+    const val DENIED = "denied"
+    const val NOT_GRANTED = "not-granted"
+    const val NO_REMOTE = "no-remote"
+
+    /** Anything else is the name of whatever the probe threw, and stands alone. */
+    fun text(context: Context, reason: String): String = when (reason) {
+        NONE -> context.getString(R.string.reading_none)
+        DENIED -> context.getString(R.string.reading_denied)
+        NOT_GRANTED -> context.getString(R.string.reading_not_granted)
+        NO_REMOTE -> context.getString(R.string.reading_no_remote)
+        else -> reason
     }
 }
 

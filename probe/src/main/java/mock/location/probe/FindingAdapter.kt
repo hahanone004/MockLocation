@@ -100,7 +100,7 @@ class FindingAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
                     if (detail.isNotEmpty()) detail.append('\n')
                     detail.append(Report.scenarioList(context, scenarios))
                         .append(": ")
-                        .append(reason)
+                        .append(Reason.text(context, reason))
                 }
 
             binding.detail.text = detail

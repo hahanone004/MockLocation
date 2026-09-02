@@ -209,7 +209,7 @@ object Report {
                 finding.silent.entries.groupBy({ it.value }, { it.key })
                     .forEach { (reason, scenarios) ->
                         builder.append("  - ").append(scenarioList(context, scenarios))
-                            .append(": ").append(reason).append('\n')
+                            .append(": ").append(Reason.text(context, reason)).append('\n')
                     }
             }
             builder.append('\n')

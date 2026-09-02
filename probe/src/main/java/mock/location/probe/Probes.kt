@@ -239,14 +239,14 @@ object Probes {
         val ungranted = probe.permissions.any {
             context.checkSelfPermission(it) != PackageManager.PERMISSION_GRANTED
         }
-        if (ungranted) return Reading.Unavailable(context.getString(R.string.reading_not_granted))
+        if (ungranted) return Reading.Unavailable(Reason.NOT_GRANTED)
 
         return try {
             probe.read(context)
                 ?.let { Reading.Value(it) }
-                ?: Reading.Unavailable(context.getString(R.string.reading_none))
+                ?: Reading.Unavailable(Reason.NONE)
         } catch (_: SecurityException) {
-            Reading.Unavailable(context.getString(R.string.reading_denied))
+            Reading.Unavailable(Reason.DENIED)
         } catch (t: Throwable) {
             Reading.Unavailable(t.javaClass.simpleName)
         }
