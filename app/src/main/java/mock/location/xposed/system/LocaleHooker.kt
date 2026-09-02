@@ -12,6 +12,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage
 import mock.location.xposed.helpers.ConfigGateway
 import mock.location.xposed.helpers.reflect.Log
 import mock.location.xposed.helpers.reflect.findAllMethods
+import mock.location.xposed.helpers.reflect.findField
 import mock.location.xposed.helpers.reflect.findMethod
 import mock.location.xposed.helpers.reflect.hookAfter
 import mock.location.xposed.helpers.reflect.hookBefore
@@ -34,8 +35,12 @@ import java.util.concurrent.atomic.AtomicBoolean
  * reading Locale.getDefault() spoke another - and would quietly undo an in-app
  * language picker besides.
  *
- * Three places are held, and all of them are cold:
+ * Four places are held, and all of them are cold:
  *
+ *  - The configuration ResourcesManager keeps and builds every later Resources
+ *    out of. It is filled in before any hook here exists, so it is patched at
+ *    attach rather than intercepted; without it an activity is handed the
+ *    device's language however right the rest of the process is.
  *  - The configuration the system hands this process, at bind time and on every
  *    later change. This is the only place a locale is rewritten. What the app
  *    does to its own resources afterwards - updateConfiguration,
@@ -338,11 +343,62 @@ class LocaleHooker {
             }
             system.updateConfiguration(systemConfiguration, system.displayMetrics)
 
+            holdResourcesBase(packageName, effective)
+
             Log.i("locales for $packageName reported as ${effective.toLanguageTags()}")
             true
         } catch (t: Throwable) {
             Log.e("could not install the default locale for $packageName", t)
             false
+        }
+    }
+
+    /**
+     * The configuration every Resources made from here on is built out of.
+     *
+     * ResourcesManager keeps the process' configuration and applies it when it
+     * creates or updates a Resources object. It is handed that configuration
+     * during handleBindApplication - which is before Xposed dispatches
+     * handleLoadPackage, so before any hook in this class exists - and it keeps
+     * the device's real locale there for the life of the process unless a
+     * configuration change comes along to replace it.
+     *
+     * Nothing in this class could reach it. The hooks rewrite configurations on
+     * their way past, and an activity's Resources are not made from a
+     * configuration going past: they are made from this stored one, merged with
+     * the activity's own override. So an app whose process default and whose
+     * application Resources both said the profile's language handed its
+     * activity the device's - and said it again after every rotation, because
+     * the rebuild reads the same stored copy.
+     *
+     * Patched in place rather than through applyConfigurationToResources, which
+     * decides whether to do anything by comparing sequence numbers and would
+     * treat this as an old configuration and ignore it.
+     */
+    @SuppressLint("PrivateApi")
+    private fun holdResourcesBase(packageName: String, effective: LocaleList) {
+        try {
+            val clazz = Class.forName("android.app.ResourcesManager")
+            val manager = findMethod(clazz) { name == "getInstance" && isStatic }
+                .invoke(null) ?: return
+
+            val field = runCatching {
+                findField(clazz, findSuper = true) { name == "mResConfiguration" }
+            }.getOrElse {
+                findField(clazz, findSuper = true) { type == Configuration::class.java }
+            }
+            val stored = field.get(manager) as? Configuration ?: return
+
+            // ResourcesManager guards this object with its own monitor, and an
+            // activity can be launching on another thread.
+            synchronized(manager) { stored.setLocales(effective) }
+
+            Log.d { "resources base for $packageName set to ${effective.toLanguageTags()}" }
+        } catch (t: Throwable) {
+            // Not fatal: the process default and the application's own
+            // resources are already installed by the time this runs, and a
+            // configuration change repairs the rest.
+            Log.w("cannot hold the resources base for $packageName: $t")
         }
     }
 
