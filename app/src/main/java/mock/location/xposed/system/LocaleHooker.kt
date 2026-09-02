@@ -181,7 +181,12 @@ class LocaleHooker {
             }
 
             held++
-            Log.d { "system configuration held at $className.$methodName" }
+            // Which entry points took a hook is once-per-process lifecycle,
+            // not tracing, and it is the first thing worth knowing when a
+            // language is right in one context and wrong in another. A debug
+            // line is compiled out of the build people actually install, which
+            // is exactly the build where that question gets asked.
+            Log.i("system configuration held at $className.$methodName in $packageName")
         }
 
         if (held == 0) {
@@ -394,7 +399,7 @@ class LocaleHooker {
             // activity can be launching on another thread.
             synchronized(manager) { stored.setLocales(effective) }
 
-            Log.d { "resources base for $packageName set to ${effective.toLanguageTags()}" }
+            Log.i("resources base for $packageName set to ${effective.toLanguageTags()}")
         } catch (t: Throwable) {
             // Not fatal: the process default and the application's own
             // resources are already installed by the time this runs, and a
