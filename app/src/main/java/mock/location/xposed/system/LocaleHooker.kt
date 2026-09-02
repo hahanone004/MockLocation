@@ -15,6 +15,7 @@ import mock.location.xposed.helpers.reflect.findAllMethods
 import mock.location.xposed.helpers.reflect.findMethod
 import mock.location.xposed.helpers.reflect.hookAfter
 import mock.location.xposed.helpers.reflect.hookBefore
+import java.lang.reflect.Modifier
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -73,9 +74,31 @@ class LocaleHooker {
     fun hookLocale(lpparam: XC_LoadPackage.LoadPackageParam) {
         val packageName = lpparam.packageName
 
-        hookLocaleManager(lpparam, packageName)
-        hookSystemConfiguration(lpparam, packageName)
-        hookAttach(lpparam, packageName)
+        // Three independent installs, and each one survives the others failing.
+        // They used to be three calls in a row, which made them a chain: the
+        // middle one threw on a method it could not hook and took the install
+        // at attach down with it - the one that decides the language this
+        // process starts with, and the only one that runs early enough for an
+        // app that reads the language in attachBaseContext. What that looked
+        // like from outside was a language spoof that had stopped working
+        // entirely while getSystemLocales, installed first, went on answering
+        // correctly.
+        //
+        // Attach goes first for the same reason: it is the one worth having if
+        // only one of them can be had.
+        install("the language at attach", packageName) { hookAttach(lpparam, packageName) }
+        install("LocaleManager", packageName) { hookLocaleManager(lpparam, packageName) }
+        install("system configuration", packageName) {
+            hookSystemConfiguration(lpparam, packageName)
+        }
+    }
+
+    private fun install(what: String, packageName: String, block: () -> Unit) {
+        try {
+            block()
+        } catch (t: Throwable) {
+            Log.e("cannot hook $what in $packageName", t)
+        }
     }
 
     /**
@@ -132,11 +155,24 @@ class LocaleHooker {
 
             val methods = findAllMethods(clazz, findSuper = true) {
                 name == methodName &&
+                    // Walking the superclass chain finds the abstract
+                    // declaration alongside the override that implements it -
+                    // ActivityThread.handleConfigurationChanged is declared on
+                    // ClientTransactionHandler - and hooking an abstract method
+                    // throws.
+                    !Modifier.isAbstract(modifiers) &&
                     parameterTypes.any { it == Configuration::class.java }
             }
             if (methods.isEmpty()) return@forEach
 
-            methods.hookBefore { param -> holdLocales(param, packageName) }
+            // One entry point that will not take a hook is not a reason to
+            // leave the others unheld.
+            try {
+                methods.hookBefore { param -> holdLocales(param, packageName) }
+            } catch (t: Throwable) {
+                Log.w("cannot hold $className.$methodName in $packageName: $t")
+                return@forEach
+            }
 
             held++
             Log.d { "system configuration held at $className.$methodName" }
