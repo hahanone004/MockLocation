@@ -115,6 +115,23 @@
     <string name="target_scope_message">SIM properties and system language are hooked inside %s. Add this app to Vector/LSPosed scope and restart its process; System Framework scope alone only covers system-side location, cell and Wi-Fi hooks.</string>
     <string name="profile_does_nothing">%s \u00b7 spoofs nothing</string>
 
+    <string name="title_config_backup">Backup and restore</string>
+    <string name="home_backup_subtitle">Export the whole configuration to a file, or restore it</string>
+    <string name="backup_hint">The file holds every profile, which one is the default, and each app assignment. The phone numbers and ICCIDs a profile drew are in there too - they are made up, but they are what makes a restored profile the same profile rather than a similar one.</string>
+    <string name="backup_action_export">Export to a file</string>
+    <string name="backup_action_import">Import from a file</string>
+    <string name="backup_export_done">Exported %1$d profile(s) and %2$d app assignment(s)</string>
+    <string name="backup_export_failed">Could not write the file. Try another location.</string>
+    <string name="backup_framework_missing">System Framework is not connected, so there is no configuration to read.</string>
+    <string name="backup_import_title">Replace the configuration?</string>
+    <string name="backup_import_message">The file holds %1$d profile(s) and %2$d app assignment(s). Importing replaces every profile and assignment on this device; nothing is merged.</string>
+    <string name="backup_import_action">Replace</string>
+    <string name="backup_import_done">Configuration imported</string>
+    <string name="backup_import_unreadable">That file could not be read as JSON.</string>
+    <string name="backup_import_not_config">That file is not a Mock Location configuration.</string>
+    <string name="backup_import_newer">That file was written by a newer build of this module.</string>
+    <string name="backup_import_empty">That file holds no usable profile.</string>
+
     <string name="card_title_not_activated">Not activated</string>
     <string name="card_detail_not_activated">Make sure you have correctly set up this module</string>
 

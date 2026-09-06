@@ -240,6 +240,57 @@
                 </com.google.android.material.card.MaterialCardView>
 
                 <com.google.android.material.card.MaterialCardView
+                    android:id="@+id/menu_backup"
+                    style="@style/DefaultCard">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:minHeight="88dp"
+                        android:orientation="horizontal"
+                        android:padding="16dp">
+
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            app:cardBackgroundColor="@color/brand_primary_container"
+                            app:cardCornerRadius="16dp"
+                            app:cardElevation="0dp">
+                            <ImageView
+                                style="@style/DefaultImage"
+                                android:layout_gravity="center"
+                                android:src="@drawable/baseline_settings_backup_restore_24" />
+                        </com.google.android.material.card.MaterialCardView>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="16dp"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+                            <TextView
+                                style="@style/DefaultText.Option.Card"
+                                android:text="@string/title_config_backup" />
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="3dp"
+                                android:text="@string/home_backup_subtitle"
+                                android:textColor="@color/app_on_surface_variant"
+                                android:textSize="14sp" />
+                        </LinearLayout>
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:contentDescription="@null"
+                            android:src="@drawable/baseline_chevron_right_24"
+                            android:tint="@color/app_on_surface_variant" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <com.google.android.material.card.MaterialCardView
                     android:id="@+id/menu_about"
                     style="@style/DefaultCard"
                     android:layout_marginBottom="8dp">

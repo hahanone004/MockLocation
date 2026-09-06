@@ -30,6 +30,42 @@ into the system framework before use.
 4. If location is provided through Google Play services, assign `com.google.android.gms` to the same profile.
 5. SIM identity and language spoofing also require the target app to be in the module scope and restarted.
 
+## 配置备份 / Backup
+
+首页的**备份与恢复**把整份配置——每个 Profile、默认是哪一个、每个应用的指派——导出成一个
+JSON 文件，也从这样的文件恢复回来。配置本身存在 system_server 那一侧，目录名还是随机的，
+刷机、换手机、卸载重装都带不走，这个文件是它唯一的出口。
+
+导入是**整份替换**，不合并：指派关系本身就是文件的一部分，合并就得回答「两边都有的 Profile
+听谁的」，而替换是用户能预料到的那个答案，所以导入前会先报出文件里有几个 Profile、几个指派
+让人确认。Profile 抽到的手机号和 ICCID 也一并导出——它们本来就是编的，但正是它们让恢复出来
+的是同一个 Profile，而不是一个相似的。
+
+不是这个格式的文件会被当场拒绝：`ProfileStore` 的每个字段都有默认值，随便一个 JSON 都能
+「成功」解析成一份空配置，所以文件必须自报格式。由更新版本写出的文件同样拒绝，免得把它认不
+出来的字段悄悄丢掉。手写的、或直接从模块配置目录里拷出来的裸 `ProfileStore` 仍然收，因为它
+自报了 profiles，不会有歧义。
+
+**Backup and restore** on the home screen writes the whole configuration - every profile,
+which one is the default, and each app assignment - to a JSON file, and reads one back. The
+configuration itself lives on the system_server side in a directory whose name is
+randomised, so it survives neither a reflash nor a move to another phone; this file is its
+only way out.
+
+Importing **replaces** everything rather than merging. Which profile an app follows is part
+of the file, so a merge would have to answer what happens to a profile that exists on both
+sides, and replacing is the answer a user can predict - the counts in the file are shown
+first to confirm. The phone number and ICCID a profile drew go into the file too: they are
+made up, but they are what makes a restored profile the same profile rather than a similar
+one.
+
+A file that is not this format is refused on the spot. Every field of `ProfileStore` has a
+default, so any JSON document at all would otherwise parse "successfully" into an empty
+configuration - the file has to name its own format. So is a file written by a newer build,
+rather than quietly dropping the fields this one does not know. A bare `ProfileStore`,
+hand-edited or copied straight out of the module's config directory, is still accepted:
+it names its profiles, so there is nothing ambiguous about it.
+
 ## 蜂窝网络 / Cellular
 
 Profile 只描述一个 LTE 小区，因此基站伪装打开后，应用看到的小区列表里只有这一个

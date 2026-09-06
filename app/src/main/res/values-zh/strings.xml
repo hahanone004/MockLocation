@@ -106,6 +106,23 @@
     <string name="target_scope_message">SIM 属性和系统语言是在 %s 自身进程内 Hook 的。请把该应用加入 Vector/LSPosed 作用域并重启其进程；只勾选“系统框架”仅能覆盖系统侧的定位、基站和 Wi-Fi Hook。</string>
     <string name="profile_does_nothing">%s \u00b7 未开启伪装</string>
 
+    <string name="title_config_backup">备份与恢复</string>
+    <string name="home_backup_subtitle">把全部配置导出成文件，或从文件恢复</string>
+    <string name="backup_hint">文件里包含每个配置、哪一个是默认，以及每个应用的指派关系。配置里抽到的手机号和 ICCID 也在其中——它们本来就是编的，但正是它们让恢复出来的是同一个配置，而不是一个相似的配置。</string>
+    <string name="backup_action_export">导出到文件</string>
+    <string name="backup_action_import">从文件导入</string>
+    <string name="backup_export_done">已导出 %1$d 个配置、%2$d 个应用指派</string>
+    <string name="backup_export_failed">写入文件失败，换一个保存位置再试。</string>
+    <string name="backup_framework_missing">未连接到系统框架，读不到当前配置。</string>
+    <string name="backup_import_title">替换当前配置？</string>
+    <string name="backup_import_message">文件里有 %1$d 个配置、%2$d 个应用指派。导入会替换本机全部配置和指派关系，不做合并。</string>
+    <string name="backup_import_action">替换</string>
+    <string name="backup_import_done">配置已导入</string>
+    <string name="backup_import_unreadable">这个文件不是有效的 JSON。</string>
+    <string name="backup_import_not_config">这个文件不是 Mock Location 的配置文件。</string>
+    <string name="backup_import_newer">这个文件由更新版本的模块写出，当前版本读不了。</string>
+    <string name="backup_import_empty">这个文件里没有可用的配置。</string>
+
     <string name="card_title_not_activated">模块未激活</string>
     <string name="card_detail_not_activated">请检查你是否已经正确激活了模块</string>
 
